@@ -58,6 +58,9 @@ export default async function DelegatesPage({
           <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
           {searchParams.status ? stageLabel(searchParams.status) : "All"}
         </h2>
+        <div style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
+          <strong style={{ color: "var(--text)", fontSize: 15 }}>{rows.length}</strong> delegate{rows.length === 1 ? "" : "s"}
+        </div>
       </div>
 
       <style>{`.flt summary{list-style:none}.flt summary::-webkit-details-marker{display:none}`}</style>

@@ -30,6 +30,7 @@ const STAGE_COLOR: Record<string, string> = {
   cancelled: "#9b2c2c", declined: "#9b2c2c", no_show: "#9b2c2c",
 };
 type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
+const PAGE_SIZE = 100;
 
 export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -37,7 +38,8 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
   const [data, setData] = useState<Row[]>(rows);
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
   const [saving, setSaving] = useState<string | null>(null);
-  useEffect(() => { setData(rows); }, [rows]);
+  const [page, setPage] = useState(1);
+  useEffect(() => { setData(rows); setPage(1); }, [rows]);
 
   const detailHref = (id: string) => (ret ? `/delegates/${id}?return=${encodeURIComponent(ret)}` : `/delegates/${id}`);
   const toggle = (id: string) =>
@@ -53,6 +55,10 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
     if (av > bv) return 1 * sort.dir;
     return 0;
   });
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount);
+  const pageRows = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
   const clickSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 } : { key, dir: 1 }));
   const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
@@ -104,7 +110,7 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => (
+            {pageRows.map((r) => (
               <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover, #f1efe8)" } : undefined}>
                 <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} /></td>
                 <td><Link href={detailHref(r.id)}>{r.name}</Link></td>
@@ -132,7 +138,7 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
 
       {/* Mobile-only card list (the table above is hidden under 640px) */}
       <div className="sp-cards">
-        {sorted.map((r) => (
+        {pageRows.map((r) => (
           <div key={r.id} className="card sp-card" style={sel.has(r.id) ? { borderColor: "var(--info)" } : undefined}>
             <div className="sp-top">
               <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto", marginTop: 3 }} aria-label={`Select ${r.name}`} />
@@ -160,7 +166,15 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
         )}
       </div>
 
-      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>{data.length} delegates · click a column to sort · change status inline</p>
+      {pageCount > 1 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12 }}>
+          <button className="btn" type="button" disabled={current <= 1} onClick={() => setPage(current - 1)}>‹ Prev</button>
+          <span className="muted" style={{ fontSize: 13 }}>Page {current} of {pageCount}</span>
+          <button className="btn" type="button" disabled={current >= pageCount} onClick={() => setPage(current + 1)}>Next ›</button>
+        </div>
+      )}
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Click a column to sort · change status inline</p>
 
       {sel.size > 0 && (
         <div style={{ position: "sticky", bottom: 12, display: "flex", justifyContent: "center", marginTop: 12, zIndex: 30 }}>
