@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
     hasLinkedin: sp.get("has_linkedin") === "1",
   };
 
-  const delegates = await getDelegates(filters);
+  // Export the entire filtered set (not one page) — large pageSize pulls all matches.
+  const { rows: delegates } = await getDelegates({ ...filters, page: 1, pageSize: 100000 });
   const rows = delegates.map((r) => {
     const c = r.contact ?? {};
     return {

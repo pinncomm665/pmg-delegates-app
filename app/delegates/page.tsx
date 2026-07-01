@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import { getDelegates, getFilterOptions, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
+import { getDelegates, getFilterOptions, stageBadgeClass, stageLabel, STAGES, type SortKey } from "@/lib/data";
 import Shell from "../Shell";
 import DelegateSearch from "./DelegateSearch";
 import DelegatesList from "./DelegatesList";
@@ -8,6 +8,9 @@ import ExportButtons from "./ExportButtons";
 import { companyDisplay } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 100;
+const SORT_KEYS: SortKey[] = ["name", "job_title", "company", "edition", "stage"];
 
 export default async function DelegatesPage({
   searchParams,
@@ -20,9 +23,18 @@ export default async function DelegatesPage({
     has_valid_email?: string;
     has_phone?: string;
     has_linkedin?: string;
+    page?: string;
+    sort?: string;
+    dir?: string;
   };
 }) {
   const user = await requireUser();
+  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const sort: SortKey = SORT_KEYS.includes(searchParams.sort as SortKey)
+    ? (searchParams.sort as SortKey)
+    : "name";
+  const dir: "asc" | "desc" = searchParams.dir === "desc" ? "desc" : "asc";
+
   const filters = {
     brand: searchParams.brand,
     edition: searchParams.edition,
@@ -31,15 +43,21 @@ export default async function DelegatesPage({
     hasValidEmail: searchParams.has_valid_email === "1",
     hasPhone: searchParams.has_phone === "1",
     hasLinkedin: searchParams.has_linkedin === "1",
+    page,
+    pageSize: PAGE_SIZE,
+    sort,
+    dir,
   };
-  const [rows, options] = await Promise.all([getDelegates(filters), getFilterOptions()]);
+  const [{ rows, total }, options] = await Promise.all([getDelegates(filters), getFilterOptions()]);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Preserve the active filters so a delegate detail page can link back to this view.
+  // Filter-only querystring — the base a detail page links back to and that the
+  // list's sort/page controls extend.
   const qs = new URLSearchParams();
   for (const k of ["brand", "edition", "status", "q", "has_valid_email", "has_phone", "has_linkedin"] as const) {
     if (searchParams[k]) qs.set(k, searchParams[k] as string);
   }
-  const ret = qs.toString();
+  const filterQs = qs.toString();
   const extraCount = [
     searchParams.has_valid_email,
     searchParams.has_phone,
@@ -59,7 +77,7 @@ export default async function DelegatesPage({
           {searchParams.status ? stageLabel(searchParams.status) : "All"}
         </h2>
         <div style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
-          <strong style={{ color: "var(--text)", fontSize: 15 }}>{rows.length}</strong> delegate{rows.length === 1 ? "" : "s"}
+          <strong style={{ color: "var(--text)", fontSize: 15 }}>{total}</strong> delegate{total === 1 ? "" : "s"}
         </div>
       </div>
 
@@ -120,7 +138,7 @@ export default async function DelegatesPage({
         <div style={{ flex: 1, minWidth: 220 }}>
           <DelegateSearch />
         </div>
-        <ExportButtons filterQs={ret} count={rows.length} />
+        <ExportButtons filterQs={filterQs} count={total} />
       </div>
 
       <DelegatesList
@@ -134,7 +152,12 @@ export default async function DelegatesPage({
           stageLabel: stageLabel(r.stage),
           stageClass: stageBadgeClass(r.stage),
         }))}
-        ret={ret}
+        filterQs={filterQs}
+        page={page}
+        pageCount={pageCount}
+        total={total}
+        sort={sort}
+        dir={dir}
       />
     </Shell>
   );

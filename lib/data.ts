@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "./supabaseAdmin";
-import { emailStatusOf } from "./emailstatus";
 import {
   buildSummit,
   CONFIRMED_STAGES,
@@ -136,6 +135,52 @@ export type DelegateRow = {
 const REGISTRATION_FIELDS =
   "delegate_type, ticket_type, registration_date, badge_name, seating_assignment, special_access, dietary_requirements, invoice_sent, invoice_sent_at, payment_received, payment_received_at, payment_amount, complimentary, complimentary_reason, notes";
 
+export type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
+
+const SORT_COLUMN: Record<SortKey, string> = {
+  name: "full_name_clean",
+  job_title: "job_title",
+  company: "company_name",
+  edition: "event_edition",
+  stage: "stage_rank",
+};
+
+// Flatten a delegate_list_view row back into the nested DelegateRow the UI
+// (list / search / export) already consumes.
+function mapDelegateView(v: any): DelegateRow {
+  const company = v.company_name ? { name: v.company_name as string } : null;
+  return {
+    id: v.id,
+    stage: v.stage,
+    event_brand: v.event_brand,
+    event_edition: v.event_edition,
+    event_id: v.event_id,
+    ticket_type: v.ticket_type,
+    payment_received: v.payment_received,
+    company,
+    contact: {
+      id: v.contact_id,
+      full_name_clean: v.full_name_clean,
+      job_title: v.job_title,
+      email: v.email,
+      personal_email: v.personal_email,
+      phone: v.phone,
+      mobile: v.mobile,
+      office_phone: v.office_phone,
+      other_phone: v.other_phone,
+      linkedin_url_canonical: v.linkedin_url_canonical,
+      location_country: v.location_country,
+      company_name_submitted: v.company_name_submitted,
+      company,
+    },
+  };
+}
+
+export type DelegatePage = { rows: DelegateRow[]; total: number };
+
+// Server-side paginated + sorted query against delegate_list_view. Filtering,
+// sorting and the exact count all run in SQL, so it scales to any list size
+// (only one page is ever sent to the browser). Roundtables live in a separate app.
 export async function getDelegates(filters: {
   brand?: string;
   edition?: string;
@@ -144,45 +189,41 @@ export async function getDelegates(filters: {
   hasValidEmail?: boolean;
   hasPhone?: boolean;
   hasLinkedin?: boolean;
-}): Promise<DelegateRow[]> {
+  page?: number;
+  pageSize?: number;
+  sort?: SortKey;
+  dir?: "asc" | "desc";
+}): Promise<DelegatePage> {
   const sb = supabaseAdmin();
+  const pageSize = filters.pageSize ?? 100;
+  const page = Math.max(1, filters.page ?? 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const sortCol = SORT_COLUMN[filters.sort ?? "name"];
+  const asc = (filters.dir ?? "asc") !== "desc";
+
   let query = sb
-    .from("delegates")
-    .select(
-      `id, stage, event_brand, event_edition, event_id,
-       contact:contacts(${CONTACT_FIELDS}, company:companies(name:company_name_canonical))`
-    )
-    .not("event_edition", "ilike", "%roundtable%") // roundtables live in a separate app
-    .order("event_edition", { ascending: true })
-    .limit(2000);
+    .from("delegate_list_view")
+    .select("*", { count: "exact" })
+    .not("event_edition", "ilike", "%roundtable%");
 
   if (filters.brand) query = query.eq("event_brand", filters.brand);
   if (filters.edition) query = query.eq("event_edition", filters.edition);
   if (filters.status) query = query.eq("stage", filters.status.toLowerCase());
+  if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
+  if (filters.hasValidEmail) query = query.eq("email_status", "Valid");
+  if (filters.hasPhone) query = query.eq("has_phone", true);
+  if (filters.hasLinkedin) query = query.eq("has_linkedin", true);
 
-  const { data, error } = await query;
+  query = query.order(sortCol, { ascending: asc, nullsFirst: false });
+  if (sortCol !== "full_name_clean") {
+    query = query.order("full_name_clean", { ascending: true, nullsFirst: false });
+  }
+  query = query.range(from, to);
+
+  const { data, count, error } = await query;
   if (error) throw new Error(error.message);
-  let rows = (data ?? []) as unknown as DelegateRow[];
-
-  if (filters.q) {
-    const q = filters.q.toLowerCase();
-    rows = rows.filter((r) =>
-      (r.contact?.full_name_clean ?? "").toLowerCase().includes(q) ||
-      (r.company?.name ?? "").toLowerCase().includes(q)
-    );
-  }
-  if (filters.hasValidEmail) {
-    rows = rows.filter((r) => emailStatusOf(r.contact) === "Valid");
-  }
-  if (filters.hasPhone) {
-    rows = rows.filter(
-      (r) => !!(r.contact?.phone || r.contact?.mobile || r.contact?.office_phone)
-    );
-  }
-  if (filters.hasLinkedin) {
-    rows = rows.filter((r) => !!r.contact?.linkedin_url_canonical);
-  }
-  return rows;
+  return { rows: (data ?? []).map(mapDelegateView), total: count ?? 0 };
 }
 
 export async function getDelegate(id: string): Promise<DelegateRow | null> {

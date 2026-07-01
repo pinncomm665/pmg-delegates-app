@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export type Row = {
   id: string;
@@ -9,11 +10,13 @@ export type Row = {
   job_title: string;
   company: string;
   edition: string;
-  stage: string;          // raw stage value (sortable + editable)
+  stage: string;          // raw stage value (editable inline)
   stageLabel: string;
   stageClass: string;
 };
 type Campaign = { id: string; name: string; active: boolean };
+type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
+type Dir = "asc" | "desc";
 
 const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
@@ -29,39 +32,60 @@ const STAGE_COLOR: Record<string, string> = {
   registered: "#0f6e56", confirmed: "#0f6e56", attended: "#0f6e56",
   cancelled: "#9b2c2c", declined: "#9b2c2c", no_show: "#9b2c2c",
 };
-type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
-const PAGE_SIZE = 100;
 
-export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string }) {
+export default function DelegatesList({
+  rows,
+  filterQs,
+  page,
+  pageCount,
+  total,
+  sort,
+  dir,
+}: {
+  rows: Row[];
+  filterQs: string;
+  page: number;
+  pageCount: number;
+  total: number;
+  sort: SortKey;
+  dir: Dir;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState(false);
   const [data, setData] = useState<Row[]>(rows);
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "name", dir: 1 });
   const [saving, setSaving] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  useEffect(() => { setData(rows); setPage(1); }, [rows]);
+  // rows change when the server sends a new page → reset local edits + selection.
+  useEffect(() => { setData(rows); setSel(new Set()); }, [rows]);
 
-  const detailHref = (id: string) => (ret ? `/delegates/${id}?return=${encodeURIComponent(ret)}` : `/delegates/${id}`);
+  // Sorting + paging are server-side: they navigate with updated query params.
+  const buildUrl = (over: { sort?: SortKey; dir?: Dir; page?: number }) => {
+    const p = new URLSearchParams(filterQs);
+    p.set("sort", over.sort ?? sort);
+    p.set("dir", over.dir ?? dir);
+    p.set("page", String(over.page ?? 1));
+    return `/delegates?${p.toString()}`;
+  };
+  const go = (over: { sort?: SortKey; dir?: Dir; page?: number }) =>
+    startTransition(() => router.push(buildUrl(over)));
+
+  const clickSort = (key: SortKey) =>
+    go({ sort: key, dir: sort === key && dir === "asc" ? "desc" : "asc", page: 1 });
+  const arrow = (key: SortKey) => (sort === key ? (dir === "asc" ? " ▲" : " ▼") : "");
+
+  // Return target preserves page + sort so the detail "back" lands where you were.
+  const retFull = (() => {
+    const p = new URLSearchParams(filterQs);
+    p.set("page", String(page)); p.set("sort", sort); p.set("dir", dir);
+    return p.toString();
+  })();
+  const detailHref = (id: string) => `/delegates/${id}?return=${encodeURIComponent(retFull)}`;
+
   const toggle = (id: string) =>
     setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const allOn = data.length > 0 && data.every((r) => sel.has(r.id));
   const toggleAll = () => setSel(allOn ? new Set() : new Set(data.map((r) => r.id)));
-
-  const STAGE_ORDER = new Map(STAGES.map((s, i) => [s.value, i]));
-  const sorted = [...data].sort((a, b) => {
-    let av: string | number = a[sort.key], bv: string | number = b[sort.key];
-    if (sort.key === "stage") { av = STAGE_ORDER.get(a.stage) ?? 99; bv = STAGE_ORDER.get(b.stage) ?? 99; }
-    if (av < bv) return -1 * sort.dir;
-    if (av > bv) return 1 * sort.dir;
-    return 0;
-  });
-  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const current = Math.min(page, pageCount);
-  const pageRows = sorted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
-
-  const clickSort = (key: SortKey) =>
-    setSort((s) => (s.key === key ? { key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 } : { key, dir: 1 }));
-  const arrow = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
 
   const changeStage = async (id: string, stage: string) => {
     const prev = data.find((r) => r.id === id)?.stage;
@@ -84,33 +108,41 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
     </th>
   );
 
+  const Pager = () => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, opacity: pending ? 0.5 : 1 }}>
+      <button className="btn" type="button" disabled={page <= 1 || pending} onClick={() => go({ page: page - 1 })}>‹ Prev</button>
+      <span className="muted" style={{ fontSize: 13 }}>Page {page} of {pageCount}</span>
+      <button className="btn" type="button" disabled={page >= pageCount || pending} onClick={() => go({ page: page + 1 })}>Next ›</button>
+    </div>
+  );
+
   return (
     <>
       {/* Mobile-only sort control (the table headers do the sorting on desktop) */}
       <div className="sp-sort-mobile">
-        <select aria-label="Sort by" value={sort.key} onChange={(e) => setSort((s) => ({ key: e.target.value as SortKey, dir: s.dir }))}>
+        <select aria-label="Sort by" value={sort} onChange={(e) => go({ sort: e.target.value as SortKey, page: 1 })}>
           <option value="name">Sort: Name</option>
           <option value="job_title">Sort: Job title</option>
           <option value="company">Sort: Company</option>
           <option value="edition">Sort: Edition</option>
           <option value="stage">Sort: Status</option>
         </select>
-        <button type="button" className="btn" aria-label="Toggle sort direction" onClick={() => setSort((s) => ({ key: s.key, dir: (s.dir === 1 ? -1 : 1) as 1 | -1 }))}>{sort.dir === 1 ? "▲" : "▼"}</button>
+        <button type="button" className="btn" aria-label="Toggle sort direction" onClick={() => go({ dir: dir === "asc" ? "desc" : "asc", page: 1 })}>{dir === "asc" ? "▲" : "▼"}</button>
       </div>
 
-      <div className="card sp-table">
+      <div className="card sp-table" style={{ opacity: pending ? 0.6 : 1, transition: "opacity .15s" }}>
         <table>
           <thead>
             <tr>
               <th style={{ width: 28 }}>
-                <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all" style={{ width: "auto" }} />
+                <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all on page" style={{ width: "auto" }} />
               </th>
               <Th k="name">Name</Th><Th k="job_title">Job title</Th><Th k="company">Company</Th>
               <Th k="edition">Edition</Th><Th k="stage">Status</Th>
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((r) => (
+            {data.map((r) => (
               <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover, #f1efe8)" } : undefined}>
                 <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} /></td>
                 <td><Link href={detailHref(r.id)}>{r.name}</Link></td>
@@ -129,7 +161,7 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
                 </td>
               </tr>
             ))}
-            {sorted.length === 0 && (
+            {data.length === 0 && (
               <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>No delegates match these filters.</td></tr>
             )}
           </tbody>
@@ -137,8 +169,8 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
       </div>
 
       {/* Mobile-only card list (the table above is hidden under 640px) */}
-      <div className="sp-cards">
-        {pageRows.map((r) => (
+      <div className="sp-cards" style={{ opacity: pending ? 0.6 : 1 }}>
+        {data.map((r) => (
           <div key={r.id} className="card sp-card" style={sel.has(r.id) ? { borderColor: "var(--info)" } : undefined}>
             <div className="sp-top">
               <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto", marginTop: 3 }} aria-label={`Select ${r.name}`} />
@@ -161,20 +193,17 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
             </div>
           </div>
         ))}
-        {sorted.length === 0 && (
+        {data.length === 0 && (
           <div className="card sp-card muted" style={{ textAlign: "center", padding: 20 }}>No delegates match these filters.</div>
         )}
       </div>
 
-      {pageCount > 1 && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12 }}>
-          <button className="btn" type="button" disabled={current <= 1} onClick={() => setPage(current - 1)}>‹ Prev</button>
-          <span className="muted" style={{ fontSize: 13 }}>Page {current} of {pageCount}</span>
-          <button className="btn" type="button" disabled={current >= pageCount} onClick={() => setPage(current + 1)}>Next ›</button>
-        </div>
-      )}
+      {pageCount > 1 && <Pager />}
 
-      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Click a column to sort · change status inline</p>
+      <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+        {total} total · click a column to sort · change status inline
+        {sel.size > 0 ? ` · ${sel.size} selected on this page` : ""}
+      </p>
 
       {sel.size > 0 && (
         <div style={{ position: "sticky", bottom: 12, display: "flex", justifyContent: "center", marginTop: 12, zIndex: 30 }}>
@@ -190,7 +219,7 @@ export default function DelegatesList({ rows, ret }: { rows: Row[]; ret: string 
         <PushModal
           contactIds={[...sel]}
           onClose={() => setModal(false)}
-          onDone={() => { setModal(false); setSel(new Set()); location.reload(); }}
+          onDone={() => { setModal(false); setSel(new Set()); router.refresh(); }}
         />
       )}
     </>

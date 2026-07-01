@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   const q = (new URL(request.url).searchParams.get("q") ?? "").trim();
   if (q.length < 2) return NextResponse.json({ results: [] });
 
-  const rows = await getDelegates({ q });
+  const { rows } = await getDelegates({ q, pageSize: 8 });
   const results = rows.slice(0, 8).map((r) => ({
     id: r.id,
     name: r.contact?.full_name_clean ?? "—",
