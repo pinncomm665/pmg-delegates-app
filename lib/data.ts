@@ -262,21 +262,31 @@ export async function getEnrolments(contactId: string): Promise<Enrolment[]> {
   return (data ?? []) as Enrolment[];
 }
 
+const APP_BRANDS = ["10DX", "FraudSense", "4WARD"];
+
 export async function getFilterOptions(): Promise<{
   brands: string[];
   editions: string[];
 }> {
   const sb = supabaseAdmin();
-  const { data } = await sb
-    .from("delegates")
-    .select("event_brand, event_edition")
-    .limit(20000);
+  // Brands come from the canonical events registry, not from role rows — so every
+  // real brand shows (incl. 4WARD) even when it has few/no delegates yet.
+  // Roundtables are a separate app.
+  const { data: ev } = await sb
+    .from("events")
+    .select("brand")
+    .in("brand", APP_BRANDS);
   const brands = new Set<string>();
+  (ev ?? []).forEach((e: any) => { if (e.brand) brands.add(e.brand); });
+
+  // Editions come from the actual (backfilled → canonical) delegate data, so past
+  // editions that have delegates still appear and empty-result editions don't.
+  const { data } = await sb.from("delegates").select("event_edition").limit(20000);
   const editions = new Set<string>();
   (data ?? []).forEach((r: any) => {
-    if (/roundtable/i.test(r.event_edition ?? "")) return; // roundtables → separate app
-    if (r.event_brand) brands.add(r.event_brand);
-    if (r.event_edition) editions.add(r.event_edition);
+    const ed = (r.event_edition ?? "").trim();
+    if (!ed || /roundtable/i.test(ed)) return; // drop blanks + roundtables
+    editions.add(ed);
   });
   return {
     brands: Array.from(brands).sort(),
