@@ -210,6 +210,8 @@ export async function getDelegates(filters: {
   if (filters.brand) query = query.eq("event_brand", filters.brand);
   if (filters.edition) query = query.eq("event_edition", filters.edition);
   if (filters.status) query = query.eq("stage", filters.status.toLowerCase());
+  // search_text = lower(name + denormalised company); the ILIKE is served by
+  // the functional pg_trgm GIN index (mig 107).
   if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
   if (filters.hasValidEmail) query = query.eq("email_status", "Valid");
   if (filters.hasPhone) query = query.eq("has_phone", true);
