@@ -17,7 +17,7 @@ export default function ProfileTabs({
   const tabs: { k: TabKey; label: string }[] = [
     { k: "contact", label: "Contact Information" },
     { k: "history", label: "Contact History" },
-    { k: "registration", label: "Registration" },
+    { k: "registration", label: "Participation" },
   ];
 
   return (
