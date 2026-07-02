@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Avatar from "../Avatar";
 
 export type Row = {
   id: string;
   name: string;
+  photo?: string | null;
+  photoSeed?: string | null;
   job_title: string;
   company: string;
   edition: string;
@@ -145,7 +148,12 @@ export default function DelegatesList({
             {data.map((r) => (
               <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover, #f1efe8)" } : undefined}>
                 <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} /></td>
-                <td><Link href={detailHref(r.id)}>{r.name}</Link></td>
+                <td>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <Avatar name={r.name} photo={r.photo} seed={r.photoSeed} size={28} />
+                    <Link href={detailHref(r.id)}>{r.name}</Link>
+                  </span>
+                </td>
                 <td className="muted">{r.job_title}</td>
                 <td className="muted">{r.company}</td>
                 <td className="muted">{r.edition}</td>
@@ -174,6 +182,7 @@ export default function DelegatesList({
           <div key={r.id} className="card sp-card" style={sel.has(r.id) ? { borderColor: "var(--info)" } : undefined}>
             <div className="sp-top">
               <input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto", marginTop: 3 }} aria-label={`Select ${r.name}`} />
+              <Avatar name={r.name} photo={r.photo} seed={r.photoSeed} size={40} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <Link href={detailHref(r.id)} className="sp-name">{r.name}</Link>
                 <div className="sp-sub">{r.job_title}{r.company && r.company !== "—" ? ` · ${r.company}` : ""}</div>

@@ -8,6 +8,7 @@ import ProfileTabs from "./ProfileTabs";
 import { companyDisplay } from "@/lib/company";
 import RegistrationForm from "./RegistrationForm";
 import InstantlyHistory from "./InstantlyHistory";
+import Avatar from "../../Avatar";
 import Shell from "../../Shell";
 import {
   updateStatus,
@@ -76,7 +77,9 @@ export default async function DelegateDetail({
 
         <div className="card" style={{ marginTop: 12 }}>
           <div className="section" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <Avatar name={c.full_name_clean} photo={c.profile_image_url} seed={c.id} size={56} />
+              <div>
               <h2 style={{ margin: 0 }}>{c.full_name_clean ?? "—"}</h2>
               <p className="muted" style={{ margin: "2px 0 0" }}>
                 {c.job_title ?? "—"} · {companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "—"}
@@ -86,6 +89,7 @@ export default async function DelegateDetail({
                 {d.event_brand && d.event_edition ? " › " : ""}
                 {d.event_edition ?? ""}
               </p>
+              </div>
             </div>
             <span className={stageBadgeClass(d.stage)}>{stageLabel(d.stage)}</span>
           </div>
