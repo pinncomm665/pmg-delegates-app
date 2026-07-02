@@ -241,6 +241,31 @@ export async function updateRegistration(formData: FormData) {
   flash(delegateId, "ok", "Registration saved", ret);
 }
 
+// On-demand: queue a delegate (summit attend-value) profile → contact_profiles.
+export async function generateBrief(formData: FormData) {
+  await requireUser();
+  const delegateId = String(formData.get("delegateId"));
+  const ret = String(formData.get("return") ?? "");
+  const d = await loadContext(delegateId);
+  const contactId = d.contact?.id as string;
+  const eventId = d.event_id ?? null;
+  const sb = supabaseAdmin();
+
+  let sel = sb.from("contact_profiles").select("id").eq("contact_id", contactId).eq("kind", "delegate");
+  sel = eventId ? sel.eq("event_id", eventId) : sel.is("event_id", null);
+  const { data: row } = await sel.maybeSingle();
+  if (row?.id) {
+    await sb.from("contact_profiles").update({ status: "pending", updated_at: new Date().toISOString() }).eq("id", (row as any).id);
+  } else {
+    await sb.from("contact_profiles").insert({ contact_id: contactId, kind: "delegate", event_id: eventId, status: "pending" });
+  }
+  await sb.from("jobs").insert({
+    type: "profile_research", status: "queued", contact_id: contactId,
+    payload: { contact_id: contactId, kind: "delegate", event_id: eventId }, attempts: 0, max_attempts: 3,
+  });
+  flash(delegateId, "ok", "Background research queued — refresh in ~1 minute", ret);
+}
+
 export async function flagRole(formData: FormData) {
   const user = await requireUser();
   const delegateId = String(formData.get("delegateId"));

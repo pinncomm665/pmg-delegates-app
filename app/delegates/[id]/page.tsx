@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import { getDelegate, getEnrolments, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
+import { getDelegate, getEnrolments, getContactProfile, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
 import { emailStatusOf, emailStatusColors } from "@/lib/emailstatus";
 import EmailHistory from "./EmailHistory";
 import ProfileTabs from "./ProfileTabs";
@@ -17,6 +17,7 @@ import {
   removeDelegate,
 } from "./actions";
 import UpdateCompany from "./UpdateCompany";
+import BriefView from "./BriefView";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export default async function DelegateDetail({
   const es = emailStatusOf(c);
   const esc = es ? emailStatusColors(es) : null;
   const enrolments = c.id ? await getEnrolments(c.id) : [];
+  const profile = c.id ? await getContactProfile(c.id, "delegate", d.event_id) : null;
 
   return (
     <Shell user={user}>
@@ -250,6 +252,7 @@ export default async function DelegateDetail({
                 )}
               </div>
             }
+            background={<BriefView profile={profile} delegateId={d.id} ret={ret} />}
           />
         </div>
     </Shell>

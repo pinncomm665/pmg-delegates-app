@@ -242,6 +242,25 @@ export async function getDelegate(id: string): Promise<DelegateRow | null> {
   return (data as unknown as DelegateRow) ?? null;
 }
 
+// Role-scoped profile (contact_profiles) for the Background Notes tab.
+export type ContactProfile = { brief: any; status: string | null; generated_at: string | null };
+
+export async function getContactProfile(
+  contactId: string,
+  kind: string,
+  eventId: string | null
+): Promise<ContactProfile | null> {
+  const sb = supabaseAdmin();
+  let q = sb
+    .from("contact_profiles")
+    .select("brief, status, generated_at")
+    .eq("contact_id", contactId)
+    .eq("kind", kind);
+  q = eventId ? q.eq("event_id", eventId) : q.is("event_id", null);
+  const { data } = await q.maybeSingle();
+  return (data as ContactProfile) ?? null;
+}
+
 export type Enrolment = {
   campaign_id: string | null;
   campaign_name: string | null;

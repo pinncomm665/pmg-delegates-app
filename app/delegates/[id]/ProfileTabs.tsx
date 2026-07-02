@@ -2,34 +2,30 @@
 
 import { useState, type ReactNode } from "react";
 
-type TabKey = "contact" | "history" | "registration";
+type TabKey = "contact" | "history" | "registration" | "background";
 
 export default function ProfileTabs({
   contact,
   history,
   registration,
+  background,
 }: {
   contact: ReactNode;
   history: ReactNode;
   registration: ReactNode;
+  background: ReactNode;
 }) {
   const [tab, setTab] = useState<TabKey>("contact");
   const tabs: { k: TabKey; label: string }[] = [
     { k: "contact", label: "Contact Information" },
     { k: "history", label: "Contact History" },
     { k: "registration", label: "Participation" },
+    { k: "background", label: "Background Notes" },
   ];
 
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          gap: 2,
-          borderBottom: "1px solid var(--border)",
-          padding: "0 8px",
-        }}
-      >
+      <div style={{ display: "flex", gap: 2, borderBottom: "1px solid var(--border)", padding: "0 8px" }}>
         {tabs.map((t) => {
           const active = tab === t.k;
           return (
@@ -38,17 +34,10 @@ export default function ProfileTabs({
               type="button"
               onClick={() => setTab(t.k)}
               style={{
-                appearance: "none",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: "12px 14px",
-                fontSize: 14,
-                fontWeight: active ? 600 : 500,
+                appearance: "none", background: "none", border: "none", cursor: "pointer",
+                padding: "12px 14px", fontSize: 14, fontWeight: active ? 600 : 500,
                 color: active ? "var(--text)" : "var(--muted)",
-                borderBottom: active
-                  ? "2px solid #0f6e56"
-                  : "2px solid transparent",
+                borderBottom: active ? "2px solid #0f6e56" : "2px solid transparent",
                 marginBottom: -1,
               }}
             >
@@ -62,6 +51,7 @@ export default function ProfileTabs({
         {tab === "contact" && contact}
         {tab === "history" && history}
         {tab === "registration" && registration}
+        {tab === "background" && background}
       </div>
     </>
   );
