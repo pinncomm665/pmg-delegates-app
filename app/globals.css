@@ -94,6 +94,24 @@ th { color: var(--muted); font-weight: 500; }
   .main { padding: 14px; }
 }
 
+/* ── Stage tabs (per-event) — horizontally scrollable pill strip ───────────── */
+.stage-tabs {
+  display: flex; gap: 6px; overflow-x: auto; margin: 0 0 16px;
+  padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.stage-tab {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  padding: 7px 13px; border: 1px solid var(--border); border-radius: 999px;
+  background: #fff; color: var(--text); font-size: 13px; text-decoration: none;
+}
+.stage-tab:hover { background: var(--bg); }
+.stage-tab.active { background: var(--info); border-color: var(--info); color: #fff; }
+.stage-tab-count {
+  font-size: 12px; line-height: 1; padding: 3px 7px; border-radius: 999px;
+  background: rgba(0,0,0,0.06); color: inherit;
+}
+.stage-tab.active .stage-tab-count { background: rgba(255,255,255,0.25); }
+
 /* ── Speakers list: stacked filters + card layout on small screens ─────────── */
 .sp-cards { display: none; }
 .sp-sort-mobile { display: none; }

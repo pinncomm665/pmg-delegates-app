@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   healthColors,
   type SummitPulse,
@@ -180,6 +181,14 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
                 Close
               </button>
             </div>
+
+            <Link
+              href={`/delegates?edition=${encodeURIComponent(sel.name)}`}
+              className="btn btn-primary"
+              style={{ display: "block", textAlign: "center", marginTop: 14, textDecoration: "none" }}
+            >
+              View delegates →
+            </Link>
 
             <div style={{ margin: "18px 0" }}>
               <Pill label={sel.label} pct={sel.progressPct} />

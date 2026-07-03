@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import { getDelegates, getFilterOptions, stageBadgeClass, stageLabel, STAGES, type SortKey } from "@/lib/data";
+import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, STAGES, type SortKey } from "@/lib/data";
 import Shell from "../Shell";
 import DelegateSearch from "./DelegateSearch";
 import DelegatesList from "./DelegatesList";
 import ExportButtons from "./ExportButtons";
+import StageTabs from "./StageTabs";
 import { companyDisplay } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,11 @@ export default async function DelegatesPage({
     sort,
     dir,
   };
-  const [{ rows, total }, options] = await Promise.all([getDelegates(filters), getFilterOptions()]);
+  const [{ rows, total }, options, stageCounts] = await Promise.all([
+    getDelegates(filters),
+    getFilterOptions(),
+    searchParams.edition ? getStageCounts(filters) : Promise.resolve(null),
+  ]);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Filter-only querystring — the base a detail page links back to and that the
@@ -101,12 +106,15 @@ export default async function DelegatesPage({
               <option key={e} value={e}>{e}</option>
             ))}
           </select>
-          <select name="status" defaultValue={searchParams.status ?? ""} style={{ flex: 1, minWidth: 0 }}>
-            <option value="">All statuses</option>
-            {STAGES.map((s) => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
+          {/* Status filter — hidden when an event is selected (the stage tabs below take over) */}
+          {!searchParams.edition && (
+            <select name="status" defaultValue={searchParams.status ?? ""} style={{ flex: 1, minWidth: 0 }}>
+              <option value="">All statuses</option>
+              {STAGES.map((s) => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+          )}
 
           <details className="flt-more" style={{ position: "relative" }}>
             <summary className="btn" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -132,6 +140,11 @@ export default async function DelegatesPage({
         </div>
 
       </form>
+
+      {/* Stage tabs — only when an event is selected; each tab = a stage with its per-event count */}
+      {stageCounts && (
+        <StageTabs counts={stageCounts} current={searchParams.status} searchParams={searchParams} />
+      )}
 
       {/* Row 2 — typeahead picker + export of the current filtered view */}
       <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 16 }}>

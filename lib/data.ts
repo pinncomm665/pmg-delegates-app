@@ -229,6 +229,41 @@ export async function getDelegates(filters: {
   return { rows: (data ?? []).map(mapDelegateView), total: count ?? 0 };
 }
 
+export type StageCounts = { total: number; byStage: Record<string, number> };
+
+// Per-stage delegate counts for the CURRENT filter set (minus status) — powers
+// the stage-tab strip when an event is selected. Same filters/view as
+// getDelegates so the tab counts always match the list.
+export async function getStageCounts(filters: {
+  brand?: string;
+  edition?: string;
+  q?: string;
+  hasValidEmail?: boolean;
+  hasPhone?: boolean;
+  hasLinkedin?: boolean;
+}): Promise<StageCounts> {
+  const sb = supabaseAdmin();
+  let query = sb
+    .from("delegate_list_view")
+    .select("stage")
+    .not("event_edition", "ilike", "%roundtable%");
+  if (filters.brand) query = query.eq("event_brand", filters.brand);
+  if (filters.edition) query = query.eq("event_edition", filters.edition);
+  if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
+  if (filters.hasValidEmail) query = query.eq("email_status", "Valid");
+  if (filters.hasPhone) query = query.eq("has_phone", true);
+  if (filters.hasLinkedin) query = query.eq("has_linkedin", true);
+
+  const { data, error } = await query.limit(20000);
+  if (error) throw new Error(error.message);
+  const byStage: Record<string, number> = {};
+  for (const r of data ?? []) {
+    const s = ((r as { stage: string | null }).stage ?? "identified").toLowerCase();
+    byStage[s] = (byStage[s] ?? 0) + 1;
+  }
+  return { total: (data ?? []).length, byStage };
+}
+
 export async function getDelegate(id: string): Promise<DelegateRow | null> {
   const sb = supabaseAdmin();
   const { data, error } = await sb
