@@ -33,10 +33,27 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthRoute = path === "/login";
 
+  // Per-app access: admins see everything; everyone else needs this app's
+  // slug in app_metadata.apps (stamped when the account is provisioned).
+  const md = (user?.app_metadata ?? {}) as { role?: string; apps?: string[] };
+  const canAccess =
+    !!user &&
+    (md.role === "admin" ||
+      (Array.isArray(md.apps) && md.apps.includes("delegates")));
+
   if (!user && !isAuthRoute) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (user && isAuthRoute) {
+  if (user && !canAccess && !isAuthRoute) {
+    return NextResponse.redirect(
+      new URL(
+        "/login?error=" +
+          encodeURIComponent("Your account doesn't have access to this app."),
+        request.url
+      )
+    );
+  }
+  if (user && canAccess && isAuthRoute) {
     return NextResponse.redirect(new URL("/delegates", request.url));
   }
   return response;
