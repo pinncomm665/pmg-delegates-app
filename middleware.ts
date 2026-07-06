@@ -82,7 +82,7 @@ export async function middleware(request: NextRequest) {
     );
   }
   if (user && canAccess && isAuthRoute) {
-    return NextResponse.redirect(new URL("/delegates", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
   return response;
 }
