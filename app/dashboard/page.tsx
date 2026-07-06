@@ -38,7 +38,7 @@ export default async function DashboardPage() {
 
   return (
     <Shell user={user}>
-      <h2 style={{ margin: "0 0 4px" }}>Delegate pulse</h2>
+      <h2 style={{ margin: "0 0 4px" }}>Pulse dashboard</h2>
       <p className="muted" style={{ margin: "0 0 20px", fontSize: 13 }}>
         Is each summit’s delegate registration healthy against its target?
       </p>
