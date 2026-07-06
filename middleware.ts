@@ -5,10 +5,17 @@ import { createServerClient } from "@supabase/ssr";
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // When AUTH_COOKIE_DOMAIN is set (production), share the session cookie
+  // across all *.pmgapphub.com subdomains. Unset locally → host-scoped as today.
+  const cookieOptions = process.env.AUTH_COOKIE_DOMAIN
+    ? { domain: process.env.AUTH_COOKIE_DOMAIN, path: "/", sameSite: "lax" as const, secure: true }
+    : undefined;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions,
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -21,6 +28,15 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
+          // Expire legacy host-scoped copies so they can't shadow the
+          // domain-scoped ones. Appended as raw headers AFTER all cookies.set
+          // calls — ResponseCookies is keyed by name, so a second
+          // set(name, ...) would replace the real session cookie.
+          if (process.env.AUTH_COOKIE_DOMAIN) {
+            cookiesToSet.forEach(({ name }) =>
+              response.headers.append("set-cookie", `${name}=; Path=/; Max-Age=0`)
+            );
+          }
         },
       },
     }
@@ -41,10 +57,22 @@ export async function middleware(request: NextRequest) {
     (md.role === "admin" ||
       (Array.isArray(md.apps) && md.apps.includes("delegates")));
 
+  // Hub redirect rewiring (Part 2): when HUB_URL is set, unauthenticated and
+  // unauthorized users are sent to the hub instead of the local /login page.
+  const hubUrl = process.env.HUB_URL;
+
   if (!user && !isAuthRoute) {
+    if (hubUrl) {
+      return NextResponse.redirect(
+        `${hubUrl}/login?next=${encodeURIComponent(request.url)}`
+      );
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
   if (user && !canAccess && !isAuthRoute) {
+    if (hubUrl) {
+      return NextResponse.redirect(`${hubUrl}/?denied=delegates`);
+    }
     return NextResponse.redirect(
       new URL(
         "/login?error=" +
