@@ -24,7 +24,7 @@ export default async function QueuePage() {
           Change requests submitted by the team. Approve to apply.
         </p>
 
-        <div className="card">
+        <div className="card" style={{ overflowX: "auto" }}>
           <table>
             <thead>
               <tr>

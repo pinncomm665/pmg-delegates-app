@@ -29,6 +29,7 @@ function Cautions({ rows }: { rows?: { caution: string; handling: string }[] }) 
   return (
     <div>
       <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--muted)", marginBottom: 4 }}>Cautions</div>
+      <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
           <tr>
@@ -45,6 +46,7 @@ function Cautions({ rows }: { rows?: { caution: string; handling: string }[] }) 
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -108,7 +108,8 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
 
   return (
     <>
-      <div className="card" style={{ overflow: "hidden" }}>
+      {/* ── Wide table (hidden on phones, see globals.css .dash-table) ── */}
+      <div className="card dash-table" style={{ overflow: "hidden" }}>
         <table>
           <thead>
             <tr>
@@ -143,6 +144,33 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Mobile card list (hidden on desktop, see globals.css .dash-cards) ── */}
+      <div className="dash-cards">
+        {summits.map((s) => (
+          <div
+            key={s.event_id}
+            className="card"
+            onClick={() => setSel(s)}
+            style={{ padding: "12px 14px", cursor: "pointer" }}
+          >
+            <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>{s.name}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+              {fmtDate(s.date)} · {s.daysLeft} days left
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10, gap: 8 }}>
+              <PulseBar s={s} width={120} />
+              <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>
+                {s.confirmed}
+                <span className="muted" style={{ fontSize: 11 }}> / {s.target}</span>
+              </span>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <Pill label={s.label} pct={s.progressPct} />
+            </div>
+          </div>
+        ))}
       </div>
 
       {sel && (

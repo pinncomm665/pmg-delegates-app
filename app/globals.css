@@ -84,11 +84,11 @@ th { color: var(--muted); font-weight: 500; }
 @media (max-width: 760px) {
   .shell { flex-direction: column; }
   .sidebar {
-    width: auto; flex-direction: row; align-items: center; gap: 8px;
+    width: auto; flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 4px;
     border-right: none; border-bottom: 1px solid var(--border); padding: 10px 12px;
   }
   .sidebar .brand { padding: 0 4px 0 0; }
-  .sidebar nav { flex-direction: row; gap: 2px; }
+  .sidebar nav { flex-direction: row; gap: 2px; flex-wrap: wrap; row-gap: 4px; }
   .sidebar .sb-label, .sidebar .spacer { display: none; }
   .sidebar .who { border-top: none; padding: 4px; margin-left: auto; }
   .main { padding: 14px; }
@@ -112,6 +112,9 @@ th { color: var(--muted); font-weight: 500; }
 }
 .stage-tab.active .stage-tab-count { background: rgba(255,255,255,0.25); }
 
+/* ── Pulse dashboard: mobile card fallback ──────────────────────────────────── */
+.dash-cards { display: none; }
+
 /* ── Speakers list: stacked filters + card layout on small screens ─────────── */
 .sp-cards { display: none; }
 .sp-sort-mobile { display: none; }
@@ -134,4 +137,8 @@ th { color: var(--muted); font-weight: 500; }
   .sp-card .sp-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
   .sp-card .sp-edition { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .sp-card .sp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+
+  /* Pulse dashboard: hide wide table, show stacked event cards */
+  .dash-table { display: none; }
+  .dash-cards { display: flex; flex-direction: column; gap: 10px; }
 }
