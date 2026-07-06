@@ -20,9 +20,6 @@ export default function Sidebar({ user }: { user: AppUser }) {
         <Link href="/delegates?status=invited">Invited</Link>
         <Link href="/delegates?status=registered">Registered</Link>
         <Link href="/delegates?status=confirmed">Confirmed</Link>
-        <Link href="/delegates?has_valid_email=1">Has valid email</Link>
-        <Link href="/delegates?has_phone=1">Has phone</Link>
-        <Link href="/delegates?has_linkedin=1">Has LinkedIn</Link>
       </nav>
 
       <div className="spacer" />
