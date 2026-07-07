@@ -11,7 +11,7 @@ export default function Sidebar({ user }: { user: AppUser }) {
       <nav>
         <Link href="/dashboard">Pulse dashboard</Link>
         <Link href="/delegates">All delegates</Link>
-        <Link href="/add-contact">Add Delegate</Link>
+        <Link href="/add-contact">Add Contact</Link>
         {user.role === "admin" && <Link href="/admin/queue">Review queue</Link>}
       </nav>
 
