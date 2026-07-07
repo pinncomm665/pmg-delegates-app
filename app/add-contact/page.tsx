@@ -13,10 +13,10 @@ export default async function AddContactPage() {
       <h2 style={{ margin: "0 0 4px" }}>
         <Link href="/dashboard" style={{ color: "var(--accent, #0f6e56)" }}>Home</Link>
         <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
-        Add Contact
+        Add Delegate
       </h2>
       <p className="muted" style={{ marginTop: 0, marginBottom: 20, fontSize: 13 }}>
-        Paste a LinkedIn URL to add a new contact. No free-text fields — the CRM
+        Paste a LinkedIn URL to add a new delegate. No free-text fields — the CRM
         will be hydrated automatically from LinkedIn.
       </p>
 

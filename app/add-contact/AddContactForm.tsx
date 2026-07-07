@@ -165,7 +165,7 @@ export default function AddContactForm() {
   // Form fields
   const [linkedIn, setLinkedIn] = useState("");
   const [brand, setBrand] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState("Delegate");
   const [eventId, setEventId] = useState("");
   const [note, setNote] = useState("");
 
@@ -297,7 +297,7 @@ export default function AddContactForm() {
 
   // ── Reset form after a successful submission ───────────────────────────────
   const handleReset = () => {
-    setLinkedIn(""); setBrand(""); setRole(""); setEventId(""); setNote("");
+    setLinkedIn(""); setBrand(""); setRole("Delegate"); setEventId(""); setNote("");
     setCheckResult(null); setOutcome(null); setSubmitError(null);
   };
 
