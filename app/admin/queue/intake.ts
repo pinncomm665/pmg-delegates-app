@@ -30,6 +30,8 @@ export type IntakeRequest = {
     full_name_clean: string | null;
     job_title: string | null;
     company_name: string | null;
+    email: string | null;
+    email_source: string | null;
   } | null;
   duplicate_candidates: DuplicateCandidate[] | null;
 };

@@ -44,6 +44,9 @@ export default async function QueuePage() {
                     <div className="muted" style={{ fontSize: 12 }}>
                       {[r.hydrated?.job_title, r.hydrated?.company_name].filter(Boolean).join(" · ") || "—"}
                     </div>
+                    <div style={{ fontSize: 12, marginTop: 2, color: r.hydrated?.email ? "#1a7f4b" : "#999" }}>
+                      {r.hydrated?.email ? `✉ ${r.hydrated.email}` : "✉ no email found"}
+                    </div>
                     {r.linkedin_url && (
                       <a href={r.linkedin_url} target="_blank" rel="noreferrer" className="muted" style={{ fontSize: 12 }}>
                         LinkedIn ↗
