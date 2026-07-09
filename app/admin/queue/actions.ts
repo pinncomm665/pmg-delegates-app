@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { postIntakeReview } from "./intake";
 
 export async function approveRequest(formData: FormData) {
   const admin = await requireAdmin();
@@ -95,5 +96,41 @@ export async function rejectRequest(formData: FormData) {
     })
     .eq("id", id)
     .eq("status", "pending");
+  revalidatePath("/admin/queue");
+}
+
+// ── New-contact intake queue (contact_intake_requests via the agent) ────────
+// These act on the agent's staff-intake queue, NOT contact_change_requests.
+
+export async function approveIntake(formData: FormData) {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id"));
+  await postIntakeReview({ request_id: id, action: "approve", reviewed_by: admin.id });
+  revalidatePath("/admin/queue");
+}
+
+export async function mergeIntake(formData: FormData) {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id"));
+  const mergeInto = String(formData.get("merge_into"));
+  await postIntakeReview({
+    request_id: id,
+    action: "merge",
+    reviewed_by: admin.id,
+    merge_into_contact_id: mergeInto,
+  });
+  revalidatePath("/admin/queue");
+}
+
+export async function rejectIntake(formData: FormData) {
+  const admin = await requireAdmin();
+  const id = String(formData.get("id"));
+  const reason = formData.get("reason");
+  await postIntakeReview({
+    request_id: id,
+    action: "reject",
+    reviewed_by: admin.id,
+    reject_reason: reason ? String(reason) : null,
+  });
   revalidatePath("/admin/queue");
 }
