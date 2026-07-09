@@ -32,7 +32,17 @@ type OutcomeAdded = {
 };
 type OutcomePending = { outcome: "pending_review"; request_id: string };
 type OutcomeDuplicate = { outcome: "duplicate"; contact: DupContact };
-type SubmitOutcome = OutcomeAdded | OutcomePending | OutcomeDuplicate;
+type OutcomeAttached = {
+  outcome: "attached";
+  already_existed?: boolean;
+  contact: {
+    full_name_clean?: string | null;
+    job_title?: string | null;
+    company_name?: string | null;
+    profile_image_url?: string | null;
+  };
+};
+type SubmitOutcome = OutcomeAdded | OutcomePending | OutcomeDuplicate | OutcomeAttached;
 
 type IntakeRequest = {
   id: string;
@@ -301,6 +311,39 @@ export default function AddContactForm() {
     setCheckResult(null); setOutcome(null); setSubmitError(null);
   };
 
+  // ── Attach existing ("Use this record") ────────────────────────────────────
+  const handleAttach = async () => {
+    if (!checkResult || checkResult.duplicate !== true || submitting) return;
+    if (!brand || !role) { setSubmitError("Select a brand and role first."); return; }
+    setSubmitting(true);
+    setSubmitError(null);
+    setOutcome(null);
+    try {
+      const body: Record<string, string> = {
+        contact_id: checkResult.contact.id,
+        event_brand: brand,
+        participant_type: role,
+      };
+      if (eventId) body.event_id = eventId;
+      const res = await fetch("/api/intake-attach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.outcome !== "attached") {
+        const msg = data && typeof data.error === "string" ? data.error : "server error";
+        setSubmitError(`Couldn’t add to event (${msg}).`);
+        return;
+      }
+      setOutcome(data);
+    } catch {
+      setSubmitError("Couldn’t add to event (network error).");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const showEditionSelect = brand && brand !== "PMG Roundtables";
@@ -359,6 +402,31 @@ export default function AddContactForm() {
             style={{ marginTop: 10 }}
           >
             Try again
+          </button>
+        </div>
+      )}
+
+      {outcome?.outcome === "attached" && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ border: "1.5px solid #a4d4bc", background: "var(--success-bg)", borderRadius: 10, padding: "12px 14px" }}>
+            <p style={{ margin: "0 0 4px", fontWeight: 600, color: "var(--success)", fontSize: 13 }}>
+              {outcome.already_existed ? "Already on this edition" : "Added to edition"}
+            </p>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{outcome.contact.full_name_clean || "—"}</p>
+            {outcome.contact.job_title && (
+              <p style={{ margin: "2px 0 0", fontSize: 13, color: "var(--muted)" }}>
+                {outcome.contact.job_title}
+                {outcome.contact.company_name ? ` · ${outcome.contact.company_name}` : ""}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleReset}
+            style={{ marginTop: 12 }}
+          >
+            Add another
           </button>
         </div>
       )}
@@ -472,9 +540,21 @@ export default function AddContactForm() {
           )}
 
           {isDupBlocked && (
-            <p style={{ margin: 0, fontSize: 13, color: "#9b2c2c" }}>
-              This person is already in the CRM. Remove the URL to submit a different contact.
-            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <p style={{ margin: 0, fontSize: 13, color: "#9b2c2c" }}>
+                Already in the CRM — a new contact can’t be added. You can add this
+                existing record to the selected brand/edition and role instead.
+              </p>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleAttach}
+                disabled={submitting || !brand || !role}
+                style={{ alignSelf: "flex-start" }}
+              >
+                {submitting ? "Adding…" : `Use this record — add as ${role || "…"}`}
+              </button>
+            </div>
           )}
 
           <button
