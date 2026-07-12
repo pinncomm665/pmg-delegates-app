@@ -1,15 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Refreshes the Supabase auth session cookie on every request and gates routes.
+// Refreshes the Supabase auth session cookie on every request, gates routes,
+// and forwards the verified user to pages via the x-pmg-user header so
+// lib/session doesn't pay a second auth round trip per render.
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Never trust a client-supplied copy of the identity header.
+  request.headers.delete("x-pmg-user");
 
   // When AUTH_COOKIE_DOMAIN is set (production), share the session cookie
   // across all *.pmgapphub.com subdomains. Unset locally → host-scoped as today.
   const cookieOptions = process.env.AUTH_COOKIE_DOMAIN
     ? { domain: process.env.AUTH_COOKIE_DOMAIN, path: "/", sameSite: "lax" as const, secure: true }
     : undefined;
+
+  let sessionCookies: { name: string; value: string; options?: any }[] = [];
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -21,22 +26,10 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
+          sessionCookies = cookiesToSet;
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-          // Expire legacy host-scoped copies so they can't shadow the
-          // domain-scoped ones. Appended as raw headers AFTER all cookies.set
-          // calls — ResponseCookies is keyed by name, so a second
-          // set(name, ...) would replace the real session cookie.
-          if (process.env.AUTH_COOKIE_DOMAIN) {
-            cookiesToSet.forEach(({ name }) =>
-              response.headers.append("set-cookie", `${name}=; Path=/; Max-Age=0`)
-            );
-          }
         },
       },
     }
@@ -83,6 +76,36 @@ export async function middleware(request: NextRequest) {
   }
   if (user && canAccess && isAuthRoute) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
+  // Forward the verified user so lib/session reads it without a second auth
+  // round trip. encodeURIComponent keeps the header ASCII-safe.
+  if (user) {
+    request.headers.set(
+      "x-pmg-user",
+      encodeURIComponent(
+        JSON.stringify({
+          id: user.id,
+          email: user.email ?? null,
+          app_metadata: user.app_metadata ?? {},
+          user_metadata: user.user_metadata ?? {},
+        })
+      )
+    );
+  }
+
+  const response = NextResponse.next({ request });
+  sessionCookies.forEach(({ name, value, options }) =>
+    response.cookies.set(name, value, options)
+  );
+  // Expire legacy host-scoped copies so they can't shadow the
+  // domain-scoped ones. Appended as raw headers AFTER all cookies.set
+  // calls — ResponseCookies is keyed by name, so a second
+  // set(name, ...) would replace the real session cookie.
+  if (process.env.AUTH_COOKIE_DOMAIN) {
+    sessionCookies.forEach(({ name }) =>
+      response.headers.append("set-cookie", `${name}=; Path=/; Max-Age=0`)
+    );
   }
   return response;
 }
