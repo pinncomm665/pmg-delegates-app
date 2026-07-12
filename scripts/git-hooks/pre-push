@@ -1,0 +1,8 @@
+#!/bin/sh
+# Pre-push gate (no CI on this repo). Instant static guard: server pages and
+# layouts must use lib/session (middleware-verified x-pmg-user header), never
+# raw supabase auth.getUser() — one careless call reintroduces a network round
+# trip to Supabase auth per render. Emergency bypass: git push --no-verify
+set -e
+cd "$(git rev-parse --show-toplevel)"
+scripts/check-auth-helpers.sh
