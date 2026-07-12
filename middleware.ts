@@ -56,8 +56,17 @@ export async function middleware(request: NextRequest) {
 
   if (!user && !isAuthRoute) {
     if (hubUrl) {
+      // Behind Railway's proxy request.url resolves to the internal host
+      // (e.g. https://localhost:8080), so rebuild the public return-to URL
+      // from the forwarded headers. Absent locally → fall back to request.url.
+      const fwdHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+      const fwdProto =
+        request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+      const returnTo = fwdHost
+        ? `${fwdProto}://${fwdHost}${request.nextUrl.pathname}${request.nextUrl.search}`
+        : request.url;
       return NextResponse.redirect(
-        `${hubUrl}/login?next=${encodeURIComponent(request.url)}`
+        `${hubUrl}/login?next=${encodeURIComponent(returnTo)}`
       );
     }
     return NextResponse.redirect(new URL("/login", request.url));
