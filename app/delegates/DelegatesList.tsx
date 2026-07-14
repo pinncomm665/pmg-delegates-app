@@ -24,6 +24,7 @@ type Dir = "asc" | "desc";
 const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
   { value: "invited", label: "Invited" },
+  { value: "applied", label: "Applied" },
   { value: "registered", label: "Registered" },
   { value: "confirmed", label: "Confirmed" },
   { value: "attended", label: "Attended" },
@@ -32,7 +33,7 @@ const STAGES: { value: string; label: string }[] = [
   { value: "no_show", label: "No Show" },
 ];
 const STAGE_COLOR: Record<string, string> = {
-  registered: "#0f6e56", confirmed: "#0f6e56", attended: "#0f6e56",
+  applied: "#b45309", registered: "#0f6e56", confirmed: "#0f6e56", attended: "#0f6e56",
   cancelled: "#9b2c2c", declined: "#9b2c2c", no_show: "#9b2c2c",
 };
 

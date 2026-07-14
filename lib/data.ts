@@ -350,10 +350,13 @@ export async function getFilterOptions(): Promise<{
 }
 
 // Delegate registration lifecycle. Registration-and-payment oriented (not the
-// speaker briefed/ready track).
+// speaker briefed/ready track). 'applied' is the Webflow → Luma bridge's
+// self-service path (delegate submitted the application form and is sitting
+// pending-approval in Luma) — parallel to invited, not a replacement for it.
 export const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
   { value: "invited", label: "Invited" },
+  { value: "applied", label: "Applied" },
   { value: "registered", label: "Registered" },
   { value: "confirmed", label: "Confirmed" },
   { value: "attended", label: "Attended" },

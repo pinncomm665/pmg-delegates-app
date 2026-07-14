@@ -4,15 +4,17 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-const STAGE_VALUES = ["identified", "invited", "registered", "confirmed", "attended", "cancelled", "declined", "no_show"];
+const STAGE_VALUES = ["identified", "invited", "applied", "registered", "confirmed", "attended", "cancelled", "declined", "no_show"];
 
 // Stage → lifecycle timestamp column stamped when a delegate enters that stage.
 const STAGE_STAMP: Record<string, string> = {
   invited: "invited_at",
+  applied: "applied_at",
   registered: "registered_at",
   confirmed: "confirmed_at",
   attended: "attended_at",
   cancelled: "cancelled_at",
+  declined: "declined_at",
 };
 
 // POST { delegate_id, stage } → update a delegate's stage inline from the table.
