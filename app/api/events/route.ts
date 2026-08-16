@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-// GET ?brand=FraudSense  → returns active events for the given brand, upcoming first.
+// GET ?brand=VERIFY  → returns active events for the given brand, upcoming first.
 // Used by the Add Contact form to populate the Edition select.
 export async function GET(req: NextRequest) {
   const user = await getUser();

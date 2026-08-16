@@ -30,7 +30,7 @@ export async function getDashboard(): Promise<DashboardData> {
   const { data: events } = await sb
     .from("events")
     .select("id, brand, edition_name, event_date_start, delegate_target")
-    .in("brand", ["10DX", "FraudSense", "4WARD"])
+    .in("brand", ["10DX", "VERIFY", "4WARD", "FraudSense"])
     .eq("is_active", true)
     .not("edition_name", "is", null)
     .not("edition_name", "ilike", "%roundtable%")
@@ -317,7 +317,10 @@ export async function getEnrolments(contactId: string): Promise<Enrolment[]> {
   return (data ?? []) as Enrolment[];
 }
 
-const APP_BRANDS = ["10DX", "FraudSense", "4WARD"];
+// "FraudSense" is the RETIRED name for VERIFY (renamed 2026-08-16, pmg-agent
+// mig 208). Kept in the READ filters only, so these views cannot go blank if this
+// app deploys either side of the migration. Remove once the rename has settled.
+const APP_BRANDS = ["10DX", "VERIFY", "4WARD", "FraudSense"];
 
 export async function getFilterOptions(): Promise<{
   brands: string[];
