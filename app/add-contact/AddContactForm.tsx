@@ -57,7 +57,7 @@ type IntakeRequest = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const BRANDS = ["10DX", "FraudSense", "4WARD", "PMG Roundtables"];
+const BRANDS = ["10DX", "VERIFY", "4WARD", "PMG Roundtables"];
 const ROLES = ["Delegate", "Speaker", "Sponsor", "Moderator", "Emcee", "Media", "VIP"];
 
 const STATUS_LABEL: Record<string, string> = {
