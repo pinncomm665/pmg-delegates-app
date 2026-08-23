@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useDialog } from "../useDialog";
 import Link from "next/link";
 import {
   healthColors,
@@ -86,7 +87,7 @@ function PulseBar({ s, width = 160 }: { s: SummitPulse; width?: number }) {
 
 function gapNode(gap: number) {
   if (gap === 0)
-    return <span style={{ color: "#0f6e56", fontWeight: 600 }}>✓ met</span>;
+    return <span style={{ color: "var(--accent)", fontWeight: 600 }}>✓ met</span>;
   return (
     <span style={{ fontWeight: 500 }}>
       {gap}
@@ -123,12 +124,12 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
           </thead>
           <tbody>
             {summits.map((s) => (
-              <tr
-                key={s.event_id}
-                onClick={() => setSel(s)}
-                style={{ cursor: "pointer" }}
-              >
-                <td style={{ fontWeight: 500 }}>{s.name}</td>
+              <tr key={s.event_id}>
+                <td>
+                  <button type="button" className="dash-row-btn" onClick={() => setSel(s)} aria-haspopup="dialog">
+                    {s.name}
+                  </button>
+                </td>
                 <td className="muted">
                   {fmtDate(s.date)}
                   <div style={{ fontSize: 11 }}>{s.daysLeft} days left</div>
@@ -149,11 +150,12 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
       {/* ── Mobile card list (hidden on desktop, see globals.css .dash-cards) ── */}
       <div className="dash-cards">
         {summits.map((s) => (
-          <div
+          <button
             key={s.event_id}
-            className="card"
+            type="button"
+            className="card dash-card-btn"
             onClick={() => setSel(s)}
-            style={{ padding: "12px 14px", cursor: "pointer" }}
+            aria-haspopup="dialog"
           >
             <div style={{ fontWeight: 600, fontSize: 15, lineHeight: 1.3 }}>{s.name}</div>
             <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
@@ -169,43 +171,55 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
             <div style={{ marginTop: 8 }}>
               <Pill label={s.label} pct={s.progressPct} />
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
-      {sel && (
-        <>
-          <div
-            onClick={() => setSel(null)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(20,20,18,0.28)",
-              zIndex: 40,
-            }}
-          />
-          <aside
-            style={{
-              position: "fixed",
-              top: 0,
-              right: 0,
-              height: "100%",
-              width: 380,
-              maxWidth: "90vw",
-              background: "var(--card)",
-              borderLeft: "1px solid var(--border)",
-              boxShadow: "-8px 0 30px rgba(0,0,0,0.08)",
-              zIndex: 50,
-              padding: "22px 24px",
-              overflowY: "auto",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 500 }}>{sel.name}</div>
+      {sel && <Drawer sel={sel} onClose={() => setSel(null)} />}
+    </>
+  );
+}
+
+function Drawer({ sel, onClose }: { sel: SummitPulse; onClose: () => void }) {
+  const ref = useDialog(onClose);
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(20,20,18,0.28)",
+          zIndex: 40,
+        }}
+      />
+      <aside
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dash-drawer-title"
+        tabIndex={-1}
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          height: "100%",
+          width: 380,
+          maxWidth: "90vw",
+          background: "var(--card)",
+          borderLeft: "1px solid var(--border)",
+          boxShadow: "-8px 0 30px rgba(0,0,0,0.08)",
+          zIndex: 50,
+          padding: "22px 24px",
+          overflowY: "auto",
+        }}
+      >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 8 }}>
+              <div style={{ minWidth: 0 }}>
+                <div id="dash-drawer-title" style={{ fontSize: 17, fontWeight: 500 }}>{sel.name}</div>
                 <div className="muted" style={{ fontSize: 13 }}>{fmtDate(sel.date)}</div>
               </div>
-              <button className="btn" style={{ padding: "4px 10px" }} onClick={() => setSel(null)}>
+              <button className="btn" style={{ padding: "4px 10px" }} onClick={onClose}>
                 Close
               </button>
             </div>
@@ -247,8 +261,6 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
               Delegate trend will appear here once history is tracked.
             </p>
           </aside>
-        </>
-      )}
     </>
   );
 }

@@ -30,19 +30,21 @@ export default function StageTabs({
   const Tab = ({ label, count, status }: { label: string; count: number; status?: string }) => {
     const active = status ? current === status : !current;
     return (
-      <Link href={href(status)} className={`stage-tab${active ? " active" : ""}`}>
+      <Link href={href(status)} className={`stage-tab${active ? " active" : ""}`} aria-current={active ? "page" : undefined}>
         {label}
         <span className="stage-tab-count">{count}</span>
       </Link>
     );
   };
 
+  // These are links (full navigations), not ARIA tabs — so a <nav> with
+  // aria-current on the active one, not role="tablist".
   return (
-    <div className="stage-tabs" role="tablist" aria-label="Delegate stages">
+    <nav className="stage-tabs" aria-label="Stages">
       <Tab label="All" count={counts.total} />
       {STAGES.map((s) => (
         <Tab key={s.value} label={s.label} count={counts.byStage[s.value] ?? 0} status={s.value} />
       ))}
-    </div>
+    </nav>
   );
 }
