@@ -12,6 +12,13 @@ const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
 // filtered query runs here (single source of filter logic); the spreadsheet /
 // Drive build is delegated to pmg-agent's shared utils.
 const COLUMNS = ["Name", "Job Title", "Company", "Edition", "Status", "Ticket", "Paid", "Email", "Phone", "LinkedIn", "Country"];
+const EXPORT_CAP = 10_000; // mirrored in app/delegates/ExportButtons.tsx
+
+// Safe download filename: "Delegates - VERIFY Saudi Arabia 2026 - 2026-08-23.xlsx"
+function fileName(scope: string, datePart: string): string {
+  const clean = scope.replace(/[^\w .()-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return `Delegates - ${clean} - ${datePart}.xlsx`;
+}
 
 export async function GET(request: NextRequest) {
   await requireUser();
@@ -28,8 +35,11 @@ export async function GET(request: NextRequest) {
     hasLinkedin: sp.get("has_linkedin") === "1",
   };
 
-  // Export the entire filtered set (not one page) — large pageSize pulls all matches.
-  const { rows: delegates } = await getDelegates({ ...filters, page: 1, pageSize: 100000 });
+  // Export the entire filtered set (not one page), capped at EXPORT_CAP rows so
+  // an unfiltered export can't exhaust memory. The cap is surfaced to the
+  // caller via X-Export-Truncated (and the total via X-Export-Total).
+  const { rows: delegates, total } = await getDelegates({ ...filters, page: 1, pageSize: EXPORT_CAP });
+  const truncated = total > EXPORT_CAP;
   const rows = delegates.map((r) => {
     const c = r.contact ?? {};
     return {
@@ -63,7 +73,10 @@ export async function GET(request: NextRequest) {
 
   if (mode === "drive") {
     const data = await res.json().catch(() => ({ error: "drive export failed" }));
-    return NextResponse.json(data, { status: res.ok ? 200 : 502 });
+    return NextResponse.json(
+      { ...data, truncated, total, exported: rows.length, cap: EXPORT_CAP },
+      { status: res.ok ? 200 : 502 }
+    );
   }
 
   if (!res.ok) {
@@ -71,12 +84,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: err.slice(0, 200) }, { status: 502 });
   }
   const buf = await res.arrayBuffer();
+  const fname = fileName(scope, datePart);
   return new NextResponse(buf, {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": res.headers.get("content-disposition") ?? `attachment; filename="${title}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${fname}"; filename*=UTF-8''${encodeURIComponent(fname)}`,
       "Cache-Control": "no-store",
+      "X-Export-Total": String(total),
+      "X-Export-Truncated": truncated ? "1" : "0",
     },
   });
 }

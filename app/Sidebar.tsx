@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { logout } from "./login/actions";
-import type { AppUser } from "@/lib/session";
+import { isReviewer, type AppUser } from "@/lib/session";
 import NavLinks, { type NavItem } from "./NavLinks";
 
 export function viewItems(user: AppUser): NavItem[] {
@@ -8,7 +8,8 @@ export function viewItems(user: AppUser): NavItem[] {
     { href: "/dashboard", label: "Pulse dashboard" },
     { href: "/delegates", label: "All delegates" },
     { href: "/add-contact", label: "Add Contact" },
-    ...(user.role === "admin" ? [{ href: "/admin/queue", label: "Review queue" }] : []),
+    { href: "/my-changes", label: "My changes" },
+    ...(isReviewer(user) ? [{ href: "/admin/queue", label: "Review queue" }] : []),
   ];
 }
 

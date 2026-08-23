@@ -337,3 +337,84 @@ code { overflow-wrap: anywhere; }
 /* ── Detail page: input + button rows (email / phone / status) ─────────────── */
 .detail-row { display: flex; gap: 8px; }
 .detail-row > input, .detail-row > select { min-width: 0; flex: 1; }
+
+/* ── Toasts (bottom-centre, stackable, above the mobile tab bar) ───────────── */
+.toasts {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 80;
+  display: flex; flex-direction: column-reverse; gap: 8px; width: min(92vw, 460px); pointer-events: none;
+}
+@media (max-width: 760px) { .toasts { bottom: calc(var(--tabbar-h) + 12px); } }
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 10px;
+  background: var(--text); color: #fff; border-radius: 10px; padding: 10px 12px 10px 14px;
+  font-size: 13.5px; box-shadow: 0 8px 28px rgba(0,0,0,0.22);
+  animation: toast-in .18s ease-out;
+}
+.toast-warn { background: var(--warn); }
+@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.toast-msg { flex: 1; min-width: 0; }
+.toast-btn {
+  appearance: none; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.3);
+  color: #fff; border-radius: 7px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  text-decoration: none; white-space: nowrap;
+}
+.toast-btn:hover { background: rgba(255,255,255,0.24); }
+.toast-x {
+  appearance: none; background: none; border: none; color: #fff; opacity: .75; cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 0 2px;
+}
+.toast-x:hover { opacity: 1; }
+
+/* ── Activity log (detail tab + /my-changes) ───────────────────────────────── */
+.activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.activity-row { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.activity-row:last-child { border-bottom: none; }
+.activity-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; }
+.activity-diff { min-width: 0; overflow-wrap: anywhere; }
+.activity-meta { font-size: 12px; margin-top: 3px; }
+
+/* ── Company re-link: confirm card + results list ──────────────────────────── */
+.confirm-card { padding: 12px 14px; border-color: var(--info); background: var(--info-bg); }
+.co-results { max-height: 200px; overflow-y: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.co-option {
+  display: block; width: 100%; text-align: left; padding: 8px 10px; border: none;
+  border-bottom: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; color: var(--text);
+}
+.co-option:last-child { border-bottom: none; }
+.co-option:hover { background: var(--hover); }
+.linklike {
+  appearance: none; background: none; border: none; padding: 0; color: var(--info); cursor: pointer;
+  font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ── List page: active-filter chips, Columns menu, optional columns ────────── */
+.flt-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 6px 3px 10px;
+  border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--text); white-space: nowrap;
+}
+.flt-chip a, .flt-chip button {
+  appearance: none; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 14px;
+  line-height: 1; padding: 0 3px; border-radius: 50%; text-decoration: none;
+}
+.flt-chip a:hover, .flt-chip button:hover { color: var(--danger); }
+.cols-menu { position: relative; }
+.cols-menu summary { list-style: none; }
+.cols-menu summary::-webkit-details-marker { display: none; }
+.cols-menu > div {
+  position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; padding: 12px; min-width: 170px;
+  display: flex; flex-direction: column; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+.cols-menu label { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 0; color: var(--text); }
+.cols-menu label input { width: auto; }
+.sp-card .sp-glyphs { display: flex; gap: 10px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.sp-card .sp-glyphs .on { color: var(--accent); font-weight: 600; }
+.pager { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.pager .btn { padding: 6px 10px; }
+
+/* ── Review queue ──────────────────────────────────────────────────────────── */
+.q-diff { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.q-diff .q-old { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.25); }
+.q-diff .q-new { font-weight: 600; }
+.q-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.q-count { font-weight: 500; color: var(--muted); font-size: var(--fs-base); margin-left: 8px; }
