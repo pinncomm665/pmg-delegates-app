@@ -17,6 +17,14 @@ type Msg = {
   thread_id?: string | null;
 };
 
+// "Name <a@b.com>" → "a@b.com" (lowercased); bare address passes through.
+function addressOf(v: string | null): string | null {
+  if (!v) return null;
+  const m = v.match(/<([^>]+)>/);
+  const a = (m ? m[1] : v).trim().toLowerCase();
+  return a.includes("@") ? a : null;
+}
+
 // GET /api/email-history?emails=work@co.com,personal@yahoo.com   (or ?email=…)
 // Proxies to the pmg-agent internal Gmail lookup — which accepts ONE address per
 // call — once per distinct address (work + personal), then merges and dedupes.
@@ -69,23 +77,34 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: results[0].error, messages: [] }, { status: 200 });
   }
 
-  // Merge + dedupe: prefer thread_id when the agent passes it through, else the
-  // same day|subject|snippet key the internal route uses. Newest first, cap 20.
+  // Merge + dedupe. Key = thread + direction + from-address + date(minute) +
+  // subject — i.e. every distinct MESSAGE survives (our outbound AND the reply
+  // on the same thread; three same-day sends on different threads). The only
+  // thing dropped is the exact same message surfacing twice because we searched
+  // two addresses. Deduping by thread_id alone hid every outbound behind the
+  // reply. Newest first, cap 30.
   const seen = new Set<string>();
   const messages = results
     .flatMap((r) => r.messages)
     .filter((m) => {
       const ts = Date.parse(m.date ?? "");
-      const day = Number.isFinite(ts) ? new Date(ts).toISOString().slice(0, 10) : (m.date ?? "");
-      const key = m.thread_id
-        ? `t|${m.thread_id}`
-        : `${day}|${m.subject ?? ""}|${(m.snippet ?? "").slice(0, 80)}`;
+      const minute = Number.isFinite(ts)
+        ? new Date(ts).toISOString().slice(0, 16)
+        : (m.date ?? "");
+      const from = addressOf(m.from) ?? "";
+      const key = [
+        m.thread_id ?? `s:${(m.snippet ?? "").slice(0, 80)}`,
+        m.direction,
+        from,
+        minute,
+        (m.subject ?? "").trim().toLowerCase(),
+      ].join("|");
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
     .sort((a, b) => (Date.parse(b.date ?? "") || 0) - (Date.parse(a.date ?? "") || 0))
-    .slice(0, 20);
+    .slice(0, 30);
 
   return NextResponse.json({ messages });
 }
