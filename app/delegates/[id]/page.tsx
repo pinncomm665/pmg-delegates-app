@@ -10,6 +10,7 @@ import RegistrationForm from "./RegistrationForm";
 import InstantlyHistory from "./InstantlyHistory";
 import Avatar from "../../Avatar";
 import Shell from "../../Shell";
+import Breadcrumb from "../../Breadcrumb";
 import {
   updateStatus,
   submitEmail,
@@ -22,6 +23,32 @@ import BriefView from "./BriefView";
 
 export const dynamic = "force-dynamic";
 
+// Inline lock glyph for CRM-managed (read-only) fields — SVG, not emoji, so it
+// renders consistently and carries a real tooltip.
+function Lock() {
+  const tip = "Managed by CRM — propose a change below";
+  return (
+    <span className="lock" title={tip}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" role="img" aria-label={tip}>
+        <title>{tip}</title>
+        <rect x="4" y="10.5" width="16" height="10.5" rx="2" />
+        <path d="M8 10.5V7a4 4 0 0 1 8 0v3.5" />
+      </svg>
+    </span>
+  );
+}
+
+// LinkedIn URL → the "in/slug" part, so the read-only field shows WHO the link is.
+function linkedinSlug(url: string): string {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    const path = u.pathname.replace(/\/+$/, "").replace(/^\/+/, "");
+    return path || u.hostname;
+  } catch {
+    return url;
+  }
+}
+
 function ReadOnly({ label, value, href }: { label: string; value?: string | null; href?: boolean }) {
   return (
     <div className="field">
@@ -29,14 +56,14 @@ function ReadOnly({ label, value, href }: { label: string; value?: string | null
       <span>
         {value ? (
           href ? (
-            <a href={value} target="_blank" rel="noreferrer">link</a>
+            <a href={value} target="_blank" rel="noreferrer" title={value}>{linkedinSlug(value)}</a>
           ) : (
             value
           )
         ) : (
           <span className="muted">—</span>
         )}{" "}
-        <span className="lock" title="read only">🔒</span>
+        <Lock />
       </span>
     </div>
   );
@@ -62,9 +89,21 @@ export default async function DelegateDetail({
 
   return (
     <Shell user={user}>
-        <Link href={backHref} className="muted" style={{ fontSize: 13 }}>
-          ← Back to delegates
-        </Link>
+        <div className="page-head" style={{ marginBottom: 0 }}>
+          <Breadcrumb
+            items={[
+              { label: "Home", href: "/dashboard" },
+              { label: "Delegates", href: "/delegates" },
+              ...(d.event_edition
+                ? [{ label: d.event_edition, href: `/delegates?edition=${encodeURIComponent(d.event_edition)}` }]
+                : []),
+              { label: c.full_name_clean ?? "Delegate" },
+            ]}
+          />
+          <Link href={backHref} className="muted page-head-aside" style={{ fontSize: 13 }}>
+            ← Back to delegates
+          </Link>
+        </div>
 
         {searchParams.flash && (
           <div
@@ -76,11 +115,11 @@ export default async function DelegateDetail({
         )}
 
         <div className="card" style={{ marginTop: 12 }}>
-          <div className="section" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div className="section sp-head">
+            <div className="sp-head-id">
               <Avatar name={c.full_name_clean} photo={c.profile_image_url} seed={c.id} size={56} />
               <div>
-              <h2 style={{ margin: 0 }}>{c.full_name_clean ?? "—"}</h2>
+              <h2 style={{ margin: 0, fontSize: "var(--fs-xl)" }}>{c.full_name_clean ?? "—"}</h2>
               <p className="muted" style={{ margin: "2px 0 0" }}>
                 {c.job_title ?? "—"} · {companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "—"}
               </p>
@@ -104,23 +143,14 @@ export default async function DelegateDetail({
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     <div className="field">
                       <span className="lbl">Work email</span>
-                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         {c.email ? c.email : <span className="muted">—</span>}
                         {es && esc && (
-                          <span
-                            style={{
-                              background: esc.bg,
-                              color: esc.fg,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              padding: "1px 8px",
-                              borderRadius: 999,
-                            }}
-                          >
+                          <span className="chip" style={{ background: esc.bg, color: esc.fg }}>
                             {es}
                           </span>
                         )}
-                        <span className="lock" title="read only">🔒</span>
+                        <Lock />
                       </span>
                     </div>
                     <ReadOnly label="Personal email" value={c.personal_email} />
@@ -148,7 +178,7 @@ export default async function DelegateDetail({
                     <input type="hidden" name="delegateId" value={d.id} />
                     <input type="hidden" name="return" value={ret} />
                     <label>Found a new email?</label>
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className="detail-row">
                       <input name="newEmail" type="email" placeholder="name@company.com" />
                       <button className="btn" type="submit">Verify</button>
                     </div>
@@ -161,7 +191,7 @@ export default async function DelegateDetail({
                     <input type="hidden" name="delegateId" value={d.id} />
                     <input type="hidden" name="return" value={ret} />
                     <label>Add another phone</label>
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div className="detail-row">
                       <input name="newPhone" placeholder="+…" />
                       <button className="btn" type="submit">Add</button>
                     </div>
@@ -217,7 +247,7 @@ export default async function DelegateDetail({
                   <input type="hidden" name="delegateId" value={d.id} />
                   <input type="hidden" name="return" value={ret} />
                   <label>Status</label>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className="detail-row">
                     <select name="stage" defaultValue={(d.stage ?? "identified").toLowerCase()}>
                       {STAGES.map((s) => (
                         <option key={s.value} value={s.value}>{s.label}</option>
@@ -233,7 +263,7 @@ export default async function DelegateDetail({
 
                 {user.role === "admin" && (
                   <details style={{ marginTop: 24 }}>
-                    <summary style={{ cursor: "pointer", fontSize: 14, color: "#c0392b" }}>
+                    <summary style={{ cursor: "pointer", fontSize: 14, color: "var(--danger)" }}>
                       Remove from delegates (no longer attending)
                     </summary>
                     <form action={removeDelegate} style={{ marginTop: 10 }}>
@@ -244,11 +274,7 @@ export default async function DelegateDetail({
                         longer be tracked for this event. Secured delegates
                         (registered / confirmed / attended) can’t be removed.
                       </p>
-                      <button
-                        className="btn"
-                        type="submit"
-                        style={{ color: "#c0392b", borderColor: "#e0b4b4" }}
-                      >
+                      <button className="btn btn-danger" type="submit">
                         Confirm remove
                       </button>
                     </form>

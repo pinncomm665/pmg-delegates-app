@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useDialog } from "../useDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Avatar from "../Avatar";
@@ -32,9 +33,10 @@ const STAGES: { value: string; label: string }[] = [
   { value: "declined", label: "Declined" },
   { value: "no_show", label: "No Show" },
 ];
-const STAGE_COLOR: Record<string, string> = {
-  applied: "#b45309", registered: "#0f6e56", confirmed: "#0f6e56", attended: "#0f6e56",
-  cancelled: "#9b2c2c", declined: "#9b2c2c", no_show: "#9b2c2c",
+// Tone of the inline stage select (colours come from globals.css .stage-select)
+const STAGE_TONE: Record<string, "is-positive" | "is-negative"> = {
+  registered: "is-positive", confirmed: "is-positive", attended: "is-positive",
+  cancelled: "is-negative", declined: "is-negative", no_show: "is-negative",
 };
 
 export default function DelegatesList({
@@ -106,11 +108,28 @@ export default function DelegatesList({
     } finally { setSaving(null); }
   };
 
-  const Th = ({ k, children }: { k: SortKey; children: React.ReactNode }) => (
-    <th onClick={() => clickSort(k)} style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap" }}>
-      {children}{arrow(k)}
-    </th>
+  const StageSelect = ({ r }: { r: Row }) => (
+    <select
+      className={`stage-select ${STAGE_TONE[r.stage] ?? ""}`}
+      value={r.stage}
+      disabled={saving === r.id}
+      onChange={(e) => changeStage(r.id, e.target.value)}
+      aria-label={`Stage for ${r.name}`}
+    >
+      {STAGES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+    </select>
   );
+
+  const Th = ({ k, children }: { k: SortKey; children: React.ReactNode }) => {
+    const sorted = sort === k;
+    return (
+      <th aria-sort={sorted ? (dir === "asc" ? "ascending" : "descending") : "none"} style={{ whiteSpace: "nowrap" }}>
+        <button type="button" className="th-sort" onClick={() => clickSort(k)}>
+          {children}{arrow(k)}
+        </button>
+      </th>
+    );
+  };
 
   const Pager = () => (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, opacity: pending ? 0.5 : 1 }}>
@@ -134,7 +153,7 @@ export default function DelegatesList({
         <button type="button" className="btn" aria-label="Toggle sort direction" onClick={() => go({ dir: dir === "asc" ? "desc" : "asc", page: 1 })}>{dir === "asc" ? "▲" : "▼"}</button>
       </div>
 
-      <div className="card sp-table" style={{ opacity: pending ? 0.6 : 1, transition: "opacity .15s" }}>
+      <div className="card sp-table" style={{ opacity: pending ? 0.6 : 1, transition: "opacity .15s", overflowX: "auto" }}>
         <table>
           <thead>
             <tr>
@@ -147,7 +166,7 @@ export default function DelegatesList({
           </thead>
           <tbody>
             {data.map((r) => (
-              <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover, #f1efe8)" } : undefined}>
+              <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover)" } : undefined}>
                 <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} /></td>
                 <td>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -159,14 +178,7 @@ export default function DelegatesList({
                 <td className="muted">{r.company}</td>
                 <td className="muted">{r.edition}</td>
                 <td>
-                  <select
-                    value={r.stage}
-                    disabled={saving === r.id}
-                    onChange={(e) => changeStage(r.id, e.target.value)}
-                    style={{ width: "auto", padding: "3px 8px", fontSize: 13, fontWeight: 600, color: STAGE_COLOR[r.stage] ?? "var(--text)", border: "1px solid var(--border)", borderRadius: 6, background: "#fff" }}
-                  >
-                    {STAGES.map((s) => <option key={s.value} value={s.value} style={{ color: "var(--text)" }}>{s.label}</option>)}
-                  </select>
+                  <StageSelect r={r} />
                 </td>
               </tr>
             ))}
@@ -191,14 +203,7 @@ export default function DelegatesList({
               </div>
             </div>
             <div className="sp-foot">
-              <select
-                value={r.stage}
-                disabled={saving === r.id}
-                onChange={(e) => changeStage(r.id, e.target.value)}
-                style={{ width: "auto", padding: "5px 10px", fontSize: 13, fontWeight: 600, color: STAGE_COLOR[r.stage] ?? "var(--text)", border: "1px solid var(--border)", borderRadius: 6, background: "#fff" }}
-              >
-                {STAGES.map((s) => <option key={s.value} value={s.value} style={{ color: "var(--text)" }}>{s.label}</option>)}
-              </select>
+              <StageSelect r={r} />
               <Link href={detailHref(r.id)} className="muted" style={{ fontSize: 13 }}>Open ›</Link>
             </div>
           </div>
@@ -243,6 +248,7 @@ function PushModal({ contactIds, onClose, onDone }: { contactIds: string[]; onCl
   const [result, setResult] = useState<{ pushed: number; failed: number; held_back: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const ran = useRef(false);
+  const ref = useDialog(onClose);
 
   useEffect(() => {
     if (ran.current) return; ran.current = true;
@@ -265,9 +271,18 @@ function PushModal({ contactIds, onClose, onDone }: { contactIds: string[]; onCl
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} className="card" style={{ width: 460, maxWidth: "100%", padding: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Push {contactIds.length} delegate{contactIds.length === 1 ? "" : "s"} to Instantly</h3>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="push-modal-title"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        className="card modal"
+        style={{ maxWidth: 460 }}
+      >
+        <h3 id="push-modal-title" style={{ marginTop: 0 }}>Push {contactIds.length} delegate{contactIds.length === 1 ? "" : "s"} to Instantly</h3>
 
         {result ? (
           <div>
@@ -280,11 +295,11 @@ function PushModal({ contactIds, onClose, onDone }: { contactIds: string[]; onCl
           </div>
         ) : (
           <>
-            <label>Campaign</label>
+            <label htmlFor="push-campaign">Campaign</label>
             {campaigns === null ? (
               <p className="muted" style={{ fontSize: 13 }}>Loading campaigns…</p>
             ) : (
-              <select value={chosen} onChange={(e) => setChosen(e.target.value)} style={{ width: "100%" }}>
+              <select id="push-campaign" value={chosen} onChange={(e) => setChosen(e.target.value)} style={{ width: "100%" }}>
                 <option value="">Select a campaign…</option>
                 {campaigns.map((c) => (
                   <option key={c.id} value={c.id}>{c.active ? "● " : "○ "}{c.name}{c.active ? "" : " (draft — won't send)"}</option>
@@ -295,7 +310,7 @@ function PushModal({ contactIds, onClose, onDone }: { contactIds: string[]; onCl
               ● active · ○ draft. Event date/location injected automatically. Already-pushed delegates are skipped.
               <strong> Only delegates with a verified email (Findymail / MillionVerifier / Scrubby) are enrolled</strong> — the rest are held, never bounced. (Tip: use the “Has valid email” filter to pre-select.)
             </p>
-            {err && <p style={{ color: "#9b2c2c", fontSize: 13 }}>Error: {err}</p>}
+            {err && <p style={{ color: "var(--danger)", fontSize: 13 }} role="alert">Error: {err}</p>}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
               <button className="btn" onClick={onClose} disabled={pushing}>Cancel</button>
               <button className="btn btn-primary" onClick={doPush} disabled={!chosen || pushing}>{pushing ? "Pushing…" : "Confirm push"}</button>

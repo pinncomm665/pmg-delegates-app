@@ -87,7 +87,7 @@ export default function DelegateSearch() {
                 onClick={() => go(h)}
                 style={{
                   display: "block", width: "100%", textAlign: "left", border: "none",
-                  background: i === active ? "var(--hover, #f1efe8)" : "transparent",
+                  background: i === active ? "var(--hover)" : "transparent",
                   padding: "8px 10px", borderRadius: 6, cursor: "pointer",
                 }}
               >

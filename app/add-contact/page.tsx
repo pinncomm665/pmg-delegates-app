@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/session";
 import Shell from "../Shell";
+import Breadcrumb from "../Breadcrumb";
 import AddContactForm from "./AddContactForm";
-import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -10,17 +10,14 @@ export default async function AddContactPage() {
 
   return (
     <Shell user={user}>
-      <h2 style={{ margin: "0 0 4px" }}>
-        <Link href="/dashboard" style={{ color: "var(--accent, #0f6e56)" }}>Home</Link>
-        <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
-        Add Contact
-      </h2>
-      <p className="muted" style={{ marginTop: 0, marginBottom: 20, fontSize: 13 }}>
-        Paste a LinkedIn URL to add a new contact. No free-text fields — the CRM
-        will be hydrated automatically from LinkedIn.
-      </p>
-
-      <AddContactForm />
+      <div style={{ maxWidth: 560 }}>
+        <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Add Contact" }]} />
+        <p className="muted" style={{ marginTop: 4, marginBottom: 20, fontSize: 13 }}>
+          Paste a LinkedIn URL to add a new contact. No free-text fields — the CRM
+          will be hydrated automatically from LinkedIn.
+        </p>
+        <AddContactForm />
+      </div>
     </Shell>
   );
 }
