@@ -7,6 +7,12 @@ export type ContactSummaryFacts = {
   last_contact_at?: string | null;
   last_contact_direction?: "inbound" | "outbound" | null;
   last_contact_by?: string | null;
+  last_outbound_at?: string | null;
+  last_outbound_by?: string | null;
+  last_outbound_subject?: string | null;
+  last_inbound_at?: string | null;
+  last_inbound_by?: string | null;
+  last_inbound_subject?: string | null;
   last_subject?: string | null;
   last_channel?: "email" | "instantly" | "call" | "meeting" | null;
   email_count?: number | null;
