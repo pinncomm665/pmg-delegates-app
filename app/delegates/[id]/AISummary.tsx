@@ -179,20 +179,18 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
   const paras = paragraphs(row?.summary_md ?? null);
   const facts = row?.facts ?? {};
   const cautions = Array.isArray(facts.cautions) ? facts.cautions.filter(Boolean).slice(0, 3) : [];
-  // Split view: last thing WE sent vs last thing THEY sent. Older rows (facts v1)
-  // only carry last_contact_*; fall back to that so nothing renders blank.
+  // One quiet sentence: "Last touch: we wrote 19 Aug (Safia Bano) · they replied 21 Aug" / "· no reply yet".
   const hasSplit = "last_outbound_at" in facts || "last_inbound_at" in facts;
-  const wroteBits = hasSplit
-    ? ([fmtDate(facts.last_outbound_at), facts.last_outbound_by ?? null, facts.last_outbound_subject ?? null].filter(Boolean) as string[])
-    : facts.last_contact_direction === "outbound"
-      ? ([fmtDate(facts.last_contact_at), facts.last_contact_by ?? null, facts.last_subject ?? null].filter(Boolean) as string[])
-      : [];
-  const repliedBits = hasSplit
-    ? ([fmtDate(facts.last_inbound_at), facts.last_inbound_subject ?? null].filter(Boolean) as string[])
-    : facts.last_contact_direction === "inbound"
-      ? ([fmtDate(facts.last_contact_at), facts.last_subject ?? null].filter(Boolean) as string[])
-      : [];
-  const lastBits = [...wroteBits, ...repliedBits];
+  const outAt = hasSplit ? facts.last_outbound_at : facts.last_contact_direction === "outbound" ? facts.last_contact_at : null;
+  const outBy = hasSplit ? facts.last_outbound_by : facts.last_contact_direction === "outbound" ? facts.last_contact_by : null;
+  const inAt = hasSplit ? facts.last_inbound_at : facts.last_contact_direction === "inbound" ? facts.last_contact_at : null;
+  const firstName = (outBy ?? "").split(" ")[0] || null;
+  const touchParts: string[] = [];
+  if (outAt) touchParts.push(`we wrote ${fmtDate(outAt)}${firstName ? ` (${firstName})` : ""}`);
+  if (inAt) touchParts.push(`they replied ${fmtDate(inAt)}`);
+  else if (outAt) touchParts.push("no reply yet");
+  const touchLine = touchParts.length ? `Last touch: ${touchParts.join(" · ")}` : null;
+  const lastBits = touchLine ? [touchLine] : [];
   const busy = phase === "requesting" || (phase === "polling" && inflight);
   const showBody = row?.status === "ready" && paras.length > 0;
   const updated = relTime(row?.generated_at ?? row?.updated_at);
@@ -258,20 +256,9 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
 
         {(lastBits.length > 0 || facts.next_step || cautions.length > 0) && !busy && (
           <div className="ai-sum-facts">
-            {wroteBits.length > 0 && (
-              <span className="chip chip-neutral">
-                <span className="ai-sum-k">Last we wrote</span> {wroteBits.join(" · ")}
-              </span>
-            )}
-            {(repliedBits.length > 0 || wroteBits.length > 0) && (
-              <span className={`chip ${repliedBits.length > 0 ? "chip-ok" : "chip-neutral"}`}>
-                <span className="ai-sum-k">Last they replied</span> {repliedBits.length > 0 ? repliedBits.join(" · ") : "no reply yet"}
-              </span>
-            )}
+            {touchLine && <span className="ai-sum-touch">{touchLine}</span>}
             {facts.next_step && (
-              <span className="chip chip-queued">
-                <span className="ai-sum-k">Next step</span> {facts.next_step}
-              </span>
+              <span className="ai-sum-touch"><span className="ai-sum-k">Next step</span> {facts.next_step}</span>
             )}
             {cautions.map((c, i) => (
               <span key={i} className="chip chip-warn">{c}</span>

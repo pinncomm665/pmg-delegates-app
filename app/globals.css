@@ -618,7 +618,8 @@ select.input { padding-right: 32px; }
 .ai-sum-text p { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text); }
 .ai-sum-text p + p { margin-top: 10px; }
 .ai-sum-text strong { font-weight: 600; }
-.ai-sum-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-sum-facts { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.ai-sum-touch { font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
 .ai-sum-facts .chip { white-space: normal; line-height: 1.5; padding: 3px 10px; font-weight: 500; font-size: var(--fs-sm); }
 .ai-sum-k { font-weight: 600; margin-right: 2px; }
 .ai-sum-k::after { content: ":"; }
