@@ -260,9 +260,16 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
             {facts.next_step && (
               <span className="ai-sum-touch"><span className="ai-sum-k">Next step</span> {facts.next_step}</span>
             )}
-            {cautions.map((c, i) => (
-              <span key={i} className="chip chip-warn">{c}</span>
-            ))}
+            {cautions.length > 0 && (
+              <div className="ai-sum-watch" role="note" aria-label="Watch-outs">
+                <span className="ai-sum-watch-k">Watch-outs</span>
+                <ul>
+                  {cautions.map((c, i) => (
+                    <li key={i}>{c}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
