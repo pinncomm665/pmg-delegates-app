@@ -293,7 +293,7 @@ code { overflow-wrap: anywhere; }
 .dash-table td:nth-child(2), .dash-table td:nth-child(2) > div, .dash-table td:nth-child(3) { white-space: nowrap; }
 .dash-table td:first-child .dash-row-btn { white-space: normal; }
 /* Cards up to the mobile-shell breakpoint (matches .m-topbar / .m-tabbar) */
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .dash-table { display: none; }
   .dash-cards { display: flex; flex-direction: column; gap: 10px; }
 }

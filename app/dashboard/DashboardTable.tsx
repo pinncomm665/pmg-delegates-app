@@ -110,7 +110,7 @@ export default function DashboardTable({ summits }: { summits: SummitPulse[] }) 
   return (
     <>
       {/* ── Wide table (hidden on phones, see globals.css .dash-table) ── */}
-      <div className="card dash-table" style={{ overflow: "hidden" }}>
+      <div className="card dash-table" style={{ overflowX: "auto" }}>
         <table>
           <thead>
             <tr>
