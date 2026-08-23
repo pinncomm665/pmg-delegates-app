@@ -21,10 +21,10 @@ function fmt(d: string | null) {
 
 function statusColors(s: string): { bg: string; fg: string } {
   switch (s) {
-    case "Sequence Completed": return { bg: "#e1f3ed", fg: "#0f6e56" };
+    case "Sequence Completed": return { bg: "var(--accent-soft)", fg: "var(--accent)" };
     case "Contacted": return { bg: "#e8eef9", fg: "#2a4d8f" };
     case "Queued": return { bg: "#f1efe8", fg: "#5f5e5a" };
-    case "Stopped": return { bg: "#fbeaea", fg: "#9b2c2c" };
+    case "Stopped": return { bg: "var(--danger-soft)", fg: "var(--danger)" };
     default: return { bg: "#f1efe8", fg: "#5f5e5a" };
   }
 }

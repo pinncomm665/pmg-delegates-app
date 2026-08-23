@@ -56,13 +56,13 @@ export default async function DashboardPage() {
         <Metric
           label="Weak or critical"
           value={summary.weakOrCritical}
-          accent={summary.weakOrCritical ? "#c0392b" : undefined}
+          accent={summary.weakOrCritical ? "var(--danger)" : undefined}
         />
         <Metric label="Avg delegate health" value={`${summary.avgHealthPct}%`} />
         <Metric
           label="Avg gap to pace"
           value={gapStr}
-          accent={summary.avgGap < 0 ? "#c0392b" : "#3a9e80"}
+          accent={summary.avgGap < 0 ? "var(--danger)" : "#3a9e80"}
         />
       </div>
 

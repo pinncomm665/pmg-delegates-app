@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
     title: "PMG Delegates",
   },
   other: {
-    "theme-color": "#0F1117",
+    "theme-color": "#f7f7f5",
   },
 };
 

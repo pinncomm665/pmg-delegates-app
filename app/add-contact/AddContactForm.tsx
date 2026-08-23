@@ -72,7 +72,7 @@ function statusChipStyle(status: string): React.CSSProperties {
   if (status === "auto_approved" || status === "approved")
     return { background: "var(--success-bg)", color: "var(--success)" };
   if (status === "rejected")
-    return { background: "#fce8e8", color: "#9b2c2c" };
+    return { background: "var(--danger-soft)", color: "var(--danger)" };
   if (status === "merged")
     return { background: "var(--info-bg)", color: "var(--info)" };
   return { background: "var(--warn-bg)", color: "var(--warn)" };
@@ -98,7 +98,7 @@ function DupCard({ c, label = "Already in CRM" }: { c: DupContact; label?: strin
         marginTop: 8,
       }}
     >
-      <p style={{ margin: "0 0 4px", fontWeight: 600, color: "#9b2c2c", fontSize: 13 }}>
+      <p style={{ margin: "0 0 4px", fontWeight: 600, color: "var(--danger)", fontSize: 13 }}>
         {label}
       </p>
       <p style={{ margin: 0, fontWeight: 600, fontSize: 14 }}>{c.full_name_clean || "—"}</p>
@@ -536,12 +536,12 @@ export default function AddContactForm() {
           </div>
 
           {submitError && (
-            <p style={{ margin: 0, fontSize: 13, color: "#9b2c2c" }}>{submitError}</p>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>{submitError}</p>
           )}
 
           {isDupBlocked && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <p style={{ margin: 0, fontSize: 13, color: "#9b2c2c" }}>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--danger)" }}>
                 Already in the CRM — a new contact can’t be added. You can add this
                 existing record to the selected brand/edition and role instead.
               </p>
@@ -598,7 +598,7 @@ export default function AddContactForm() {
                       {req.participant_type} · {req.event_brand} · {fmtDate(req.created_at)}
                     </p>
                     {req.status === "rejected" && req.reject_reason && (
-                      <p style={{ margin: "6px 0 0", fontSize: 12, color: "#9b2c2c" }}>
+                      <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--danger)" }}>
                         Reason: {req.reject_reason}
                       </p>
                     )}

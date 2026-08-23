@@ -21,9 +21,9 @@ export function emailStatusOf(c: any): EmailStatus | null {
 export function emailStatusColors(s: EmailStatus): { bg: string; fg: string } {
   switch (s) {
     case "Valid":
-      return { bg: "#e1f3ed", fg: "#0f6e56" };
+      return { bg: "var(--accent-soft)", fg: "var(--accent)" };
     case "Invalid":
-      return { bg: "#fbeaea", fg: "#9b2c2c" };
+      return { bg: "var(--danger-soft)", fg: "var(--danger)" };
     default:
       return { bg: "#f1efe8", fg: "#5f5e5a" }; // Unknown
   }

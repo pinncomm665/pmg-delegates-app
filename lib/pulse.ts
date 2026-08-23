@@ -50,7 +50,7 @@ export function healthColors(label: HealthLabel): {
 } {
   switch (label) {
     case "Critical":
-      return { bg: "#fbeaea", fg: "#9b2c2c", bar: "#d06363" };
+      return { bg: "var(--danger-soft)", fg: "var(--danger)", bar: "#d06363" };
     case "Weak":
       return { bg: "#fbf0dd", fg: "#8a5a12", bar: "#d99a3e" };
     case "Satisfactory":
@@ -58,7 +58,7 @@ export function healthColors(label: HealthLabel): {
     case "Good":
       return { bg: "#eaf3e3", fg: "#3f6d22", bar: "#82af5c" };
     case "On Target":
-      return { bg: "#e1f3ed", fg: "#0f6e56", bar: "#3a9e80" };
+      return { bg: "var(--accent-soft)", fg: "var(--accent)", bar: "#3a9e80" };
     case "Ahead":
       return { bg: "#edecfb", fg: "#3c3489", bar: "#7a72d0" };
     default:

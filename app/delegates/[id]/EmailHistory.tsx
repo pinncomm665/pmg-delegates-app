@@ -76,7 +76,7 @@ export default function EmailHistory({ email }: { email: string | null }) {
           <div
             key={i}
             style={{
-              borderLeft: `3px solid ${inbound ? "#0f6e56" : "#c9c6bd"}`,
+              borderLeft: `3px solid ${inbound ? "var(--accent)" : "#c9c6bd"}`,
               paddingLeft: 10,
             }}
           >
@@ -87,7 +87,7 @@ export default function EmailHistory({ email }: { email: string | null }) {
                   fontWeight: 700,
                   letterSpacing: 0.3,
                   textTransform: "uppercase",
-                  color: inbound ? "#0f6e56" : "#7a776f",
+                  color: inbound ? "var(--accent)" : "#7a776f",
                 }}
               >
                 {inbound ? "↘ Replied" : "↗ Sent"}
