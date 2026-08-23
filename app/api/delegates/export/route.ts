@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/session";
 import { getDelegates, stageLabel } from "@/lib/data";
 import { formatPhone } from "@/lib/phone";
 import { companyDisplay } from "@/lib/company";
+import { ownerDisplayName, parseOwnerFilter } from "@/lib/roleOwner";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
 // Google Sheet in the "PMG Delegate Exports" Drive folder (?mode=drive). The
 // filtered query runs here (single source of filter logic); the spreadsheet /
 // Drive build is delegated to pmg-agent's shared utils.
-const COLUMNS = ["Name", "Job Title", "Company", "Edition", "Status", "Ticket", "Paid", "Email", "Phone", "LinkedIn", "Country"];
+const COLUMNS = ["Name", "Job Title", "Company", "Edition", "Status", "Owner", "Ticket", "Paid", "Email", "Phone", "LinkedIn", "Country"];
 const EXPORT_CAP = 10_000; // mirrored in app/delegates/ExportButtons.tsx
 
 // Safe download filename: "Delegates - VERIFY Saudi Arabia 2026 - 2026-08-23.xlsx"
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
     hasValidEmail: sp.get("has_valid_email") === "1",
     hasPhone: sp.get("has_phone") === "1",
     hasLinkedin: sp.get("has_linkedin") === "1",
+    owner: parseOwnerFilter(sp.get("owner")),
   };
 
   // Export the entire filtered set (not one page), capped at EXPORT_CAP rows so
@@ -49,6 +51,7 @@ export async function GET(request: NextRequest) {
       Company: companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "",
       Edition: r.event_edition ?? "",
       Status: stageLabel(r.stage),
+      Owner: ownerDisplayName(r.owner_email) ?? "",
       Ticket: r.ticket_type ?? "",
       Paid: r.payment_received ? "Yes" : "",
       Email: c.email ?? c.personal_email ?? "",

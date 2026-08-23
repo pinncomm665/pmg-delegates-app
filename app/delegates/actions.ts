@@ -2,6 +2,7 @@
 
 import { requireUser } from "@/lib/session";
 import { getDelegateIdsMatching, SELECT_ALL_CAP } from "@/lib/data";
+import { parseOwnerFilter } from "@/lib/roleOwner";
 
 // "Select all N matching" for the bulk bar — ids of every delegate in the current
 // filter set (capped at SELECT_ALL_CAP). filterQs is the list page's filter
@@ -17,6 +18,7 @@ export async function selectAllMatching(filterQs: string): Promise<{ ids: string
     hasValidEmail: p.get("has_valid_email") === "1",
     hasPhone: p.get("has_phone") === "1",
     hasLinkedin: p.get("has_linkedin") === "1",
+    owner: parseOwnerFilter(p.get("owner")),
   });
   return { ids, capped, cap: SELECT_ALL_CAP };
 }

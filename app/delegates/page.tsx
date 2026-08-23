@@ -10,13 +10,14 @@ import ExportButtons from "./ExportButtons";
 import StageTabs from "./StageTabs";
 import FiltersSheet from "./FiltersSheet";
 import { companyDisplay } from "@/lib/company";
+import { ownerFirstName, ownerOptions, parseOwnerFilter, OWNER_UNASSIGNED } from "@/lib/roleOwner";
 
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZES = [50, 100, 250] as const;
 const DEFAULT_PAGE_SIZE = 100;
 const SORT_KEYS: SortKey[] = ["name", "job_title", "company", "edition", "stage"];
-const FILTER_KEYS = ["brand", "edition", "status", "q", "has_valid_email", "has_phone", "has_linkedin"] as const;
+const FILTER_KEYS = ["brand", "edition", "status", "q", "has_valid_email", "has_phone", "has_linkedin", "owner"] as const;
 
 function bestPhone(c: any): string | null {
   return (c?.mobile || c?.phone || c?.office_phone || c?.other_phone || null) as string | null;
@@ -33,6 +34,7 @@ export default async function DelegatesPage({
     has_valid_email?: string;
     has_phone?: string;
     has_linkedin?: string;
+    owner?: string;
     page?: string;
     pageSize?: string;
     sort?: string;
@@ -57,6 +59,7 @@ export default async function DelegatesPage({
     hasValidEmail: searchParams.has_valid_email === "1",
     hasPhone: searchParams.has_phone === "1",
     hasLinkedin: searchParams.has_linkedin === "1",
+    owner: parseOwnerFilter(searchParams.owner),
     page,
     pageSize,
     sort,
@@ -83,7 +86,7 @@ export default async function DelegatesPage({
     searchParams.has_linkedin,
   ].filter((v) => v === "1").length;
   // Brand / edition / has_* filters in force — the phone shell's "Filters (n)".
-  const activeFilterCount = extraCount + (searchParams.brand ? 1 : 0) + (searchParams.edition ? 1 : 0);
+  const activeFilterCount = extraCount + (searchParams.brand ? 1 : 0) + (searchParams.edition ? 1 : 0) + (searchParams.owner ? 1 : 0);
 
   // Same view without the search term (the removable "q" chip's target).
   const withoutQ = new URLSearchParams(filterQs);
@@ -187,6 +190,13 @@ export default async function DelegatesPage({
               </optgroup>
             )}
           </select>
+          <select name="owner" defaultValue={searchParams.owner ?? ""} style={{ flex: 1, minWidth: 0 }} aria-label="Owner">
+            <option value="">Anyone</option>
+            {ownerOptions().map((o) => (
+              <option key={o.email} value={o.email}>{o.name}</option>
+            ))}
+            <option value={OWNER_UNASSIGNED}>Unassigned</option>
+          </select>
         </FiltersSheet>
       </form>
 
@@ -208,6 +218,7 @@ export default async function DelegatesPage({
           email: r.contact?.email ?? null,
           phone: formatPhone(bestPhone(r.contact)),
           linkedin: r.contact?.linkedin_url_canonical ?? null,
+          owner: ownerFirstName(r.owner_email) ?? null,
         }))}
         filterQs={filterQs}
         hasFilters={anyFilter}

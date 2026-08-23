@@ -13,6 +13,7 @@ import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/
 import { normalizePhone } from "@/lib/phone";
 import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
 import { cleanNameFields } from "@/lib/nameClean";
+import { ownerDisplayName } from "@/lib/roleOwner";
 import { insertContactNote, isNoteChannel, fmtDuration, hasVoiceAttachment, requestTranscription, type NoteAttachment, type NoteChannel } from "@/lib/notes";
 
 async function loadContext(delegateId: string) {
@@ -729,4 +730,38 @@ export async function logActivity(input: LogActivityInput): Promise<{ ok: true; 
   revalidatePath("/activity");
   const degraded = res.degraded.length ? " (saved in compatibility mode)" : "";
   return { ok: true, message: `${channel} logged${degraded}` };
+}
+
+// ── Role owner (delegates.owner_email) ─────────────────────────────────────
+// Tier A: assign / unassign the account manager responsible for this delegate
+// row. Writes owner_email + owner_assigned_at + owner_assigned_by (= the acting
+// user) and logs kind 'other' / field 'owner'. `ownerEmail` null = Unassign.
+// The columns are added by pmg-agent in parallel — a missing-column error is
+// reported plainly rather than thrown.
+export type OwnerWriteResult = { ok: boolean; message: string; prev?: string | null; owner?: string | null };
+
+export async function setRoleOwner(delegateId: string, ownerEmail: string | null): Promise<OwnerWriteResult> {
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return { ok: false, message: ctx.denied.message };
+  const { user, d } = ctx;
+  const next = ownerEmail ? ownerEmail.trim().toLowerCase() : null;
+  if (next && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) return { ok: false, message: "Invalid owner email" };
+  const prev = (d.owner_email ?? null) ? String(d.owner_email).toLowerCase() : null;
+  if (prev === next) return { ok: true, message: "Owner unchanged", prev, owner: next };
+
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin()
+    .from("delegates")
+    .update({ owner_email: next, owner_assigned_at: next ? now : null, owner_assigned_by: next ? user.email : null })
+    .eq("id", delegateId);
+  if (error) {
+    if (/owner_email|owner_assigned/.test(error.message)) {
+      return { ok: false, message: "Owner assignment isn’t live yet (database column pending)." };
+    }
+    return { ok: false, message: error.message };
+  }
+  await logChange(user, { ...base(d), kind: "other", field: "owner", current_value: prev, proposed_value: next });
+  revalidatePath(`/delegates/${delegateId}`);
+  revalidatePath("/delegates");
+  return { ok: true, message: next ? `Owner set to ${ownerDisplayName(next)}` : "Owner cleared", prev, owner: next };
 }
