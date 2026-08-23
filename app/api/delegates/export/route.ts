@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { getDelegates, stageLabel } from "@/lib/data";
+import { formatPhone } from "@/lib/phone";
 import { companyDisplay } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
       Ticket: r.ticket_type ?? "",
       Paid: r.payment_received ? "Yes" : "",
       Email: c.email ?? c.personal_email ?? "",
-      Phone: c.phone ?? c.mobile ?? c.office_phone ?? c.other_phone ?? "",
+      Phone: formatPhone(c.phone ?? c.mobile ?? c.office_phone ?? c.other_phone) ?? "",
       LinkedIn: c.linkedin_url_canonical ?? "",
       Country: c.location_country ?? "",
     };

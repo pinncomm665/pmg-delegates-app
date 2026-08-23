@@ -7,8 +7,14 @@
 // path, no trailing slash, query/fragment dropped. Returns null when the input
 // isn't a usable /in/<slug> profile URL.
 export function canonicalizeLinkedinUrl(input: string | null | undefined): string | null {
-  const raw = input?.trim();
+  let raw = input?.trim();
   if (!raw) return null;
+  // Bare slug ("john-doe") or "in/john-doe" → treat as a profile path.
+  if (!/linkedin\.com/i.test(raw) && !/^https?:\/\//i.test(raw)) {
+    const slug = raw.replace(/^\/?(in\/)?/i, "").replace(/\/+$/, "");
+    if (!/^[A-Za-z0-9%._\-]+$/.test(slug) || slug.length < 3) return null;
+    raw = `https://www.linkedin.com/in/${slug}`;
+  }
   try {
     const parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
     const host = parsed.hostname.toLowerCase();
@@ -50,16 +56,15 @@ export function splitForEdit(full: string | null | undefined): { first: string; 
   return { first: t[0], last: t.slice(1).join(" ") };
 }
 
-export function normalizePhone(v: string): string {
-  return v.trim().replace(/\s+/g, " ");
-}
-
 export type FieldWriteResult = {
   ok: boolean;
   queued?: boolean;
   message: string;
   // The value now on the record (auto-applied writes), for optimistic UI.
   value?: string | null;
+  // Name writes: the auto-corrected first/last (so the row shows what was stored).
+  first?: string;
+  last?: string;
   // Phone moves: the other_phone value after the write (so Undo can restore it).
   other_phone?: string | null;
   // Promote-personal-email: what the outbound address looked like before the
