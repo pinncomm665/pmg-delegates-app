@@ -26,6 +26,15 @@ export function LockIcon() {
   );
 }
 
+export function PromoteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 19V5" />
+      <path d="m5 12 7-7 7 7" />
+    </svg>
+  );
+}
+
 export function Spinner() {
   return <span className="btn-spin" aria-hidden="true" />;
 }
@@ -39,6 +48,7 @@ export function DetailRow({
   onEdit,
   disabled,
   editor,
+  extraAction,
 }: {
   label: string;
   value: ReactNode;
@@ -50,6 +60,8 @@ export function DetailRow({
   // Another row is being edited → this row's Edit is disabled (one at a time).
   disabled?: boolean;
   editor?: ReactNode;
+  // Optional secondary control rendered before Edit (e.g. "Use as primary").
+  extraAction?: ReactNode;
 }) {
   return (
     <div className={`cd-row${editing ? " is-editing" : ""}`} role="group" aria-label={label}>
@@ -60,6 +72,7 @@ export function DetailRow({
         <>
           <dd className="cd-value">{value}</dd>
           <div className="cd-action">
+            {!locked && extraAction}
             {locked ? (
               <span className="cd-lock" title={lockTip} aria-label={lockTip} role="img">
                 <LockIcon />

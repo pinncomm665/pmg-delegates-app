@@ -62,4 +62,7 @@ export type FieldWriteResult = {
   value?: string | null;
   // Phone moves: the other_phone value after the write (so Undo can restore it).
   other_phone?: string | null;
+  // Promote-personal-email: what the outbound address looked like before the
+  // write, so Undo can put it back exactly (null = it was empty).
+  previous?: { email: string | null; email_source: string | null; email_mv_result: string | null };
 };

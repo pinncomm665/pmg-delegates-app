@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import { useToast } from "../../Toast";
 import { emailStatusColors, type EmailStatus } from "@/lib/emailstatus";
 import { linkedinSlug, splitForEdit, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
-import { DetailRow, InlineEditor } from "./FieldEditor";
+import { DetailRow, InlineEditor, PromoteIcon } from "./FieldEditor";
 import UpdateCompany from "./UpdateCompany";
 import {
   updateName,
   updateJobTitle,
   updatePersonalEmail,
   updateWorkEmail,
+  promotePersonalEmail,
+  undoPromotePersonalEmail,
   updatePhone,
   updateLinkedin,
   type PhoneField,
@@ -26,6 +28,7 @@ export type ContactDetailsData = {
   company_name: string | null;
   email: string | null;
   email_status: EmailStatus | null;
+  email_source: string | null;
   personal_email: string | null;
   office_phone: string | null;
   mobile: string | null;
@@ -34,7 +37,17 @@ export type ContactDetailsData = {
 };
 
 type RowKey = "name" | "job_title" | "company" | "email" | "personal_email" | "office_phone" | "mobile" | "other_phone" | "linkedin";
+// "promote" = the inline confirm card on the Personal email row ("Use as primary").
+type EditKey = RowKey | "promote";
 
+
+// Collapse a stored MV verdict back to the 3-bucket status (mirrors lib/emailstatus).
+function statusFromMv(v: string | null): EmailStatus {
+  const x = (v ?? "").toLowerCase();
+  if (["ok", "valid"].includes(x)) return "Valid";
+  if (["invalid", "disposable"].includes(x)) return "Invalid";
+  return "Unknown";
+}
 
 function Empty() {
   return <span className="muted">—</span>;
@@ -60,7 +73,7 @@ export default function ContactDetails({
   const router = useRouter();
   const toast = useToast();
   const [c, setC] = useState<ContactDetailsData>(contact);
-  const [editing, setEditing] = useState<RowKey | null>(null);
+  const [editing, setEditing] = useState<EditKey | null>(null);
   const [queued, setQueued] = useState<Partial<Record<RowKey, boolean>>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +158,20 @@ export default function ContactDetails({
     settle("email", r, () => setC((x) => ({ ...x, email: r.value ?? null, email_status: "Valid" })));
   });
 
+  // "Use as primary": personal → outbound email (MV-verified server-side).
+  // Undo passes the captured previous email/source/verdict back.
+  const promote = () => run(async () => {
+    const r = await promotePersonalEmail(delegateId);
+    const prev = r.previous;
+    settle("email", r,
+      () => setC((x) => ({ ...x, email: r.value ?? null, email_status: "Valid", email_source: "personal_promoted" })),
+      prev ? async () => {
+        const u = await undoPromotePersonalEmail(delegateId, prev);
+        if (u.ok && !u.queued) setC((x) => ({ ...x, email: prev.email, email_source: prev.email_source, email_status: prev.email ? statusFromMv(prev.email_mv_result) : null }));
+      } : undefined
+    );
+  });
+
   const savePersonalEmail = () => run(async () => {
     const prev = c.personal_email;
     const r = await updatePersonalEmail(delegateId, draft);
@@ -188,6 +215,13 @@ export default function ContactDetails({
   const QueuedChip = ({ k }: { k: RowKey }) => (queued[k] ? <span className="chip chip-queued">Sent for review</span> : null);
   const esc = c.email_status ? emailStatusColors(c.email_status) : null;
   const busy = editing !== null;
+  const promoted = !!c.email && c.email_source === "personal_promoted";
+  // Offer "Use as primary" only when there's a personal address AND the
+  // outbound one is missing or dead — and it isn't already that address.
+  const canPromote =
+    !!c.personal_email &&
+    (!c.email || c.email_status === "Invalid") &&
+    (c.email ?? "").toLowerCase() !== c.personal_email!.toLowerCase();
 
   const textInput = (props: { placeholder?: string; type?: string; inputMode?: "tel" | "email" | "url" | "text"; label: string; id: string }) => (
     <div className="field">
@@ -275,6 +309,7 @@ export default function ContactDetails({
               {c.email && c.email_status && esc && (
                 <span className="chip" style={{ background: esc.bg, color: esc.fg }}>{c.email_status}</span>
               )}
+              {promoted && <span className="chip chip-neutral" title="Promoted from the personal email">personal</span>}
               <QueuedChip k="email" />
             </>
           }
@@ -293,17 +328,37 @@ export default function ContactDetails({
         <DetailRow
           label="Personal email"
           value={<>{c.personal_email || <Empty />}<QueuedChip k="personal_email" /></>}
-          editing={editing === "personal_email"}
+          editing={editing === "personal_email" || editing === "promote"}
           onEdit={() => open("personal_email")}
           disabled={busy}
-          editor={
+          extraAction={canPromote ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm cd-edit cd-promote"
+              onClick={() => { setError(null); setEditing("promote"); }}
+              disabled={busy}
+              aria-label="Use personal email as primary"
+              title="Copy this address into the outbound email (verified first). Finders may later replace it with a corporate address."
+            >
+              <PromoteIcon />
+              <span className="btn-label">Use as primary</span>
+            </button>
+          ) : undefined}
+          editor={editing === "promote" ? (
+            <InlineEditor onSave={promote} onCancel={close} saving={saving} error={error} saveLabel="Verify & use">
+              <p className="help" style={{ margin: 0 }}>
+                This makes <strong>{c.personal_email}</strong> the outbound address. It will be verified first.
+                Personal inboxes get higher complaint rates — use for invites and re-engagement, not cold pitches.
+              </p>
+            </InlineEditor>
+          ) : (
             <InlineEditor onSave={savePersonalEmail} onCancel={close} saving={saving} error={error}
               canSave={draft.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.trim())}
               help="Warm contact only — never used for campaigns."
             >
               {textInput({ id: "cd-personal-email", label: "Personal email", type: "email", inputMode: "email", placeholder: "name@example.com" })}
             </InlineEditor>
-          }
+          )}
         />
         <DetailRow
           label="Phone"

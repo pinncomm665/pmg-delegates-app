@@ -136,7 +136,7 @@ export async function getDashboard(): Promise<DashboardData> {
 
 // Whitelisted contact fields the Delegates app is allowed to read.
 const CONTACT_FIELDS =
-  "id, full_name_clean, first_name_clean, last_name_clean, job_title, email, personal_email, phone, mobile, office_phone, other_phone, linkedin_url_canonical, location_country, email_mv_result, email_verified_status, scrubby_result, profile_brief, company_id, company_name_submitted, user_managed_fields, profile_image_url";
+  "id, full_name_clean, first_name_clean, last_name_clean, job_title, email, personal_email, phone, mobile, office_phone, other_phone, linkedin_url_canonical, location_country, email_source, email_mv_result, email_verified_status, scrubby_result, profile_brief, company_id, company_name_submitted, user_managed_fields, profile_image_url";
 
 export async function searchCompanies(
   q: string
