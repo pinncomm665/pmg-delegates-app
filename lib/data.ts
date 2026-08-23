@@ -5,6 +5,7 @@ import {
   DEFAULT_TARGET_DELEGATES,
   type SummitPulse,
 } from "./pulse";
+import { SUMMIT_BRANDS, normalizeBrand, brandOf } from "./brands";
 
 export interface DashboardData {
   summits: SummitPulse[];
@@ -13,8 +14,40 @@ export interface DashboardData {
     onTrack: number; // Good / On Target / Ahead
     weakOrCritical: number; // Weak / Critical
     avgHealthPct: number;
-    avgGap: number;
+    avgGap: number; // avg delegates still needed to reach target
   };
+}
+
+// ── Grouped counts view ─────────────────────────────────────────────────────
+// `delegate_edition_counts` (pmg-agent mig 211): one row per
+// (event_id, event_edition, stage) with n = count. Replaces the 20k-row pulls
+// for the dashboard, stage tabs and filter options. Returns null when the view
+// is missing (deploy-order safety) so callers can fall back to the old path.
+export type EditionCount = { event_id: string | null; event_edition: string | null; stage: string | null; n: number };
+
+let editionCountsMissing = false;
+export async function readEditionCounts(): Promise<EditionCount[] | null> {
+  if (editionCountsMissing) return null;
+  try {
+    const sb = supabaseAdmin();
+    const { data, error } = await sb
+      .from("delegate_edition_counts")
+      .select("event_id, event_edition, stage, n")
+      .limit(5000);
+    if (error) {
+      // 42P01 = undefined_table (view not deployed yet) → remember, fall back.
+      if ((error as any).code === "42P01" || /does not exist/i.test(error.message)) editionCountsMissing = true;
+      return null;
+    }
+    return (data ?? []).map((r: any) => ({
+      event_id: r.event_id ?? null,
+      event_edition: r.event_edition ?? null,
+      stage: r.stage ?? null,
+      n: Number(r.n ?? 0),
+    }));
+  } catch {
+    return null;
+  }
 }
 
 export async function getDashboard(): Promise<DashboardData> {
@@ -27,27 +60,41 @@ export async function getDashboard(): Promise<DashboardData> {
   // Track EVERY active, upcoming, non-roundtable edition — not just the ones
   // that already have delegates — so 0-delegate events still show (as 0/target).
   // Roundtables are excluded from the delegates app (separate app).
-  const { data: events } = await sb
-    .from("events")
-    .select("id, brand, edition_name, event_date_start, delegate_target")
-    .in("brand", ["10DX", "VERIFY", "4WARD", "FraudSense"])
-    .eq("is_active", true)
-    .not("edition_name", "is", null)
-    .not("edition_name", "ilike", "%roundtable%")
-    .gte("event_date_start", todayStr);
+  const [{ data: events }, viewCounts] = await Promise.all([
+    sb
+      .from("events")
+      .select("id, brand, edition_name, event_date_start, delegate_target")
+      .in("brand", SUMMIT_BRANDS)
+      .eq("is_active", true)
+      .not("edition_name", "is", null)
+      .not("edition_name", "ilike", "%roundtable%")
+      .gte("event_date_start", todayStr),
+    readEditionCounts(),
+  ]);
 
-  // Delegate counts per event (0 when an event has none yet).
-  const { data: del } = await sb
-    .from("delegates")
-    .select("event_id, stage")
-    .not("event_id", "is", null)
-    .limit(20000);
+  // Delegate counts per event (0 when an event has none yet) — grouped view
+  // first, row pull as fallback.
   const byEvent = new Map<string, { confirmed: number; total: number }>();
-  for (const d of del ?? []) {
-    const g = byEvent.get(d.event_id) ?? { confirmed: 0, total: 0 };
-    g.total++;
-    if (CONFIRMED_STAGES.includes((d.stage ?? "").toLowerCase())) g.confirmed++;
-    byEvent.set(d.event_id, g);
+  if (viewCounts) {
+    for (const r of viewCounts) {
+      if (!r.event_id) continue;
+      const g = byEvent.get(r.event_id) ?? { confirmed: 0, total: 0 };
+      g.total += r.n;
+      if (CONFIRMED_STAGES.includes((r.stage ?? "").toLowerCase())) g.confirmed += r.n;
+      byEvent.set(r.event_id, g);
+    }
+  } else {
+    const { data: del } = await sb
+      .from("delegates")
+      .select("event_id, stage")
+      .not("event_id", "is", null)
+      .limit(20000);
+    for (const d of del ?? []) {
+      const g = byEvent.get(d.event_id) ?? { confirmed: 0, total: 0 };
+      g.total++;
+      if (CONFIRMED_STAGES.includes((d.stage ?? "").toLowerCase())) g.confirmed++;
+      byEvent.set(d.event_id, g);
+    }
   }
 
   const summits = (events ?? [])
@@ -59,7 +106,7 @@ export async function getDashboard(): Promise<DashboardData> {
       return buildSummit({
         event_id: e.id,
         name: e.edition_name ?? "—",
-        brand: e.brand ?? null,
+        brand: normalizeBrand(e.brand) ?? null,
         date: e.event_date_start as string,
         daysLeft,
         confirmed: counts.confirmed,
@@ -93,17 +140,27 @@ const CONTACT_FIELDS =
 
 export async function searchCompanies(
   q: string
-): Promise<{ id: string; name: string }[]> {
+): Promise<{ id: string; name: string; domain: string | null }[]> {
   const sb = supabaseAdmin();
   let query = sb
     .from("companies")
-    .select("id, name:company_name_canonical")
+    .select("id, name:company_name_canonical, domain:domain_root")
     .not("company_name_canonical", "is", null)
     .order("company_name_canonical", { ascending: true })
     .limit(25);
   if (q) query = query.ilike("company_name_canonical", `${q}%`);
   const { data } = await query;
-  return (data ?? []) as { id: string; name: string }[];
+  return (data ?? []) as { id: string; name: string; domain: string | null }[];
+}
+
+export async function getCompanyById(id: string): Promise<{ id: string; name: string; domain: string | null } | null> {
+  const sb = supabaseAdmin();
+  const { data } = await sb
+    .from("companies")
+    .select("id, name:company_name_canonical, domain:domain_root")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as any) ?? null;
 }
 
 export type DelegateRow = {
@@ -113,7 +170,7 @@ export type DelegateRow = {
   event_edition: string | null;
   event_id: string | null;
   contact: any;
-  company: { name: string | null } | null;
+  company: { name: string | null; domain_root?: string | null } | null;
   // registration (delegates columns)
   delegate_type?: string | null;
   ticket_type?: string | null;
@@ -232,8 +289,10 @@ export async function getDelegates(filters: {
 export type StageCounts = { total: number; byStage: Record<string, number> };
 
 // Per-stage delegate counts for the CURRENT filter set (minus status) — powers
-// the stage-tab strip when an event is selected. Same filters/view as
-// getDelegates so the tab counts always match the list.
+// the stage-tab strip (per edition AND in the all-editions view). When only
+// brand/edition are set the grouped view answers it (no row pull); with a
+// search or has-* filter it falls back to the same filters/view as getDelegates
+// so the tab counts always match the list.
 export async function getStageCounts(filters: {
   brand?: string;
   edition?: string;
@@ -242,6 +301,24 @@ export async function getStageCounts(filters: {
   hasPhone?: boolean;
   hasLinkedin?: boolean;
 }): Promise<StageCounts> {
+  const simple = !filters.q && !filters.hasValidEmail && !filters.hasPhone && !filters.hasLinkedin;
+  if (simple) {
+    const view = await readEditionCounts();
+    if (view) {
+      const byStage: Record<string, number> = {};
+      let total = 0;
+      for (const r of view) {
+        const ed = r.event_edition ?? "";
+        if (/roundtable/i.test(ed)) continue;
+        if (filters.edition && ed !== filters.edition) continue;
+        if (filters.brand && brandOf(ed) !== normalizeBrand(filters.brand)) continue;
+        const s = (r.stage ?? "identified").toLowerCase();
+        byStage[s] = (byStage[s] ?? 0) + r.n;
+        total += r.n;
+      }
+      return { total, byStage };
+    }
+  }
   const sb = supabaseAdmin();
   let query = sb
     .from("delegate_list_view")
@@ -270,12 +347,59 @@ export async function getDelegate(id: string): Promise<DelegateRow | null> {
     .from("delegates")
     .select(
       `id, stage, event_brand, event_edition, event_id, ${REGISTRATION_FIELDS},
-       contact:contacts(${CONTACT_FIELDS}, company:companies(name:company_name_canonical))`
+       contact:contacts(${CONTACT_FIELDS}, company:companies(name:company_name_canonical, domain_root))`
     )
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data as unknown as DelegateRow) ?? null;
+}
+
+// Brief status only — polled by the detail page while a research job is in flight.
+export async function getDelegateBriefStatus(
+  contactId: string,
+  eventId: string | null
+): Promise<{ status: string | null; generated_at: string | null } | null> {
+  const sb = supabaseAdmin();
+  let q = sb
+    .from("contact_profiles")
+    .select("status, generated_at")
+    .eq("contact_id", contactId)
+    .eq("kind", "delegate");
+  q = eventId ? q.eq("event_id", eventId) : q.is("event_id", null);
+  const { data } = await q.maybeSingle();
+  if (!data) return null;
+  return { status: (data as any).status ?? null, generated_at: (data as any).generated_at ?? null };
+}
+
+// Ids of EVERY delegate matching the filter set (for "Select all N matching"),
+// capped so a runaway filter can't pull the whole table into the browser.
+export const SELECT_ALL_CAP = 2000;
+export async function getDelegateIdsMatching(filters: {
+  brand?: string;
+  edition?: string;
+  status?: string;
+  q?: string;
+  hasValidEmail?: boolean;
+  hasPhone?: boolean;
+  hasLinkedin?: boolean;
+}): Promise<{ ids: string[]; capped: boolean }> {
+  const sb = supabaseAdmin();
+  let query = sb
+    .from("delegate_list_view")
+    .select("id")
+    .not("event_edition", "ilike", "%roundtable%");
+  if (filters.brand) query = query.eq("event_brand", filters.brand);
+  if (filters.edition) query = query.eq("event_edition", filters.edition);
+  if (filters.status) query = query.eq("stage", filters.status.toLowerCase());
+  if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
+  if (filters.hasValidEmail) query = query.eq("email_status", "Valid");
+  if (filters.hasPhone) query = query.eq("has_phone", true);
+  if (filters.hasLinkedin) query = query.eq("has_linkedin", true);
+  const { data, error } = await query.order("full_name_clean", { ascending: true }).limit(SELECT_ALL_CAP + 1);
+  if (error) throw new Error(error.message);
+  const ids = (data ?? []).map((r: any) => r.id as string);
+  return { ids: ids.slice(0, SELECT_ALL_CAP), capped: ids.length > SELECT_ALL_CAP };
 }
 
 // Role-scoped profile (contact_profiles) for the Background Notes tab.
@@ -317,38 +441,69 @@ export async function getEnrolments(contactId: string): Promise<Enrolment[]> {
   return (data ?? []) as Enrolment[];
 }
 
-// "FraudSense" is the RETIRED name for VERIFY (renamed 2026-08-16, pmg-agent
-// mig 208). Kept in the READ filters only, so these views cannot go blank if this
-// app deploys either side of the migration. Remove once the rename has settled.
-const APP_BRANDS = ["10DX", "VERIFY", "4WARD", "FraudSense"];
+export type EditionOption = { name: string; brand: string | null; date: string | null; upcoming: boolean };
 
 export async function getFilterOptions(): Promise<{
   brands: string[];
   editions: string[];
+  editionOptions: EditionOption[];
 }> {
   const sb = supabaseAdmin();
-  // Brands come from the canonical events registry, not from role rows — so every
-  // real brand shows (incl. 4WARD) even when it has few/no delegates yet.
+  const today = new Date().toISOString().slice(0, 10);
+  // Brands + editions come from the canonical events registry (active/upcoming
+  // first), UNIONed with the distinct editions that actually have delegate rows
+  // (grouped view — no 20k-row pull) so past editions with delegates still appear.
   // Roundtables are a separate app.
-  const { data: ev } = await sb
-    .from("events")
-    .select("brand")
-    .in("brand", APP_BRANDS);
+  const [{ data: ev }, view] = await Promise.all([
+    sb
+      .from("events")
+      .select("brand, edition_name, event_date_start, is_active")
+      .in("brand", SUMMIT_BRANDS)
+      .not("edition_name", "is", null)
+      .not("edition_name", "ilike", "%roundtable%"),
+    readEditionCounts(),
+  ]);
   const brands = new Set<string>();
-  (ev ?? []).forEach((e: any) => { if (e.brand) brands.add(e.brand); });
-
-  // Editions come from the actual (backfilled → canonical) delegate data, so past
-  // editions that have delegates still appear and empty-result editions don't.
-  const { data } = await sb.from("delegates").select("event_edition").limit(20000);
-  const editions = new Set<string>();
-  (data ?? []).forEach((r: any) => {
-    const ed = (r.event_edition ?? "").trim();
-    if (!ed || /roundtable/i.test(ed)) return; // drop blanks + roundtables
-    editions.add(ed);
+  const byName = new Map<string, EditionOption>();
+  (ev ?? []).forEach((e: any) => {
+    const b = normalizeBrand(e.brand as string | null);
+    if (b) brands.add(b);
+    const name = (e.edition_name ?? "").trim();
+    if (!name) return;
+    const date = (e.event_date_start as string | null) ?? null;
+    byName.set(name, { name, brand: b ?? null, date, upcoming: !!e.is_active && !!date && date >= today });
   });
+
+  const seen = new Set<string>();
+  if (view) {
+    for (const r of view) {
+      const ed = (r.event_edition ?? "").trim();
+      if (!ed || /roundtable/i.test(ed)) continue;
+      seen.add(ed);
+    }
+  } else {
+    const { data } = await sb.from("delegates").select("event_edition").limit(20000);
+    (data ?? []).forEach((r: any) => {
+      const ed = (r.event_edition ?? "").trim();
+      if (ed && !/roundtable/i.test(ed)) seen.add(ed);
+    });
+  }
+  for (const ed of seen) {
+    if (!byName.has(ed)) byName.set(ed, { name: ed, brand: brandOf(ed), date: null, upcoming: false });
+  }
+  // Only editions that are upcoming OR have delegates — registry stubs with no
+  // rows and a past date are noise.
+  const editionOptions = Array.from(byName.values())
+    .filter((o) => o.upcoming || seen.has(o.name))
+    .sort((a, b) => {
+      if (a.upcoming !== b.upcoming) return a.upcoming ? -1 : 1;
+      if (a.upcoming && a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
   return {
     brands: Array.from(brands).sort(),
-    editions: Array.from(editions).sort(),
+    editions: editionOptions.map((o) => o.name),
+    editionOptions,
   };
 }
 
@@ -358,6 +513,7 @@ export async function getFilterOptions(): Promise<{
 // pending-approval in Luma) — parallel to invited, not a replacement for it.
 export const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
+  { value: "shortlisted", label: "Shortlisted" },
   { value: "invited", label: "Invited" },
   { value: "applied", label: "Applied" },
   { value: "registered", label: "Registered" },

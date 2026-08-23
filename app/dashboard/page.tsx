@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/session";
 import { getDashboard } from "@/lib/data";
+import { healthColors, healthLabel } from "@/lib/pulse";
 import Shell from "../Shell";
 import DashboardTable from "./DashboardTable";
 
@@ -34,7 +35,8 @@ function Metric({
 export default async function DashboardPage() {
   const user = await requireUser();
   const { summits, summary } = await getDashboard();
-  const gapStr = summary.avgGap > 0 ? `+${summary.avgGap}` : `${summary.avgGap}`;
+  // Tiles are coloured by the portfolio's health band, not by sign.
+  const band = healthColors(healthLabel(summary.avgHealthPct));
 
   return (
     <Shell user={user}>
@@ -58,11 +60,11 @@ export default async function DashboardPage() {
           value={summary.weakOrCritical}
           accent={summary.weakOrCritical ? "var(--danger)" : undefined}
         />
-        <Metric label="Avg delegate health" value={`${summary.avgHealthPct}%`} />
+        <Metric label="Avg delegate health" value={`${summary.avgHealthPct}%`} accent={band.fg} />
         <Metric
-          label="Avg gap to pace"
-          value={gapStr}
-          accent={summary.avgGap < 0 ? "var(--danger)" : "#3a9e80"}
+          label="Avg remaining to target"
+          value={summary.avgGap}
+          accent={band.fg}
         />
       </div>
 

@@ -246,7 +246,8 @@ function Drawer({ sel, onClose }: { sel: SummitPulse; onClose: () => void }) {
               {[
                 ["Days left", `${sel.daysLeft}`],
                 ["Confirmed delegates", `${sel.confirmed}`],
-                ["Gap to target", `${sel.gap}`],
+                ["Remaining to target", `${sel.gap}`],
+                ["Target", `${sel.target}`],
                 ["Target progress", `${Math.round(sel.finalProgress * 100)}%`],
                 ["Total delegates (all stages)", `${sel.total}`],
               ].map(([k, v]) => (
@@ -256,10 +257,6 @@ function Drawer({ sel, onClose }: { sel: SummitPulse; onClose: () => void }) {
                 </div>
               ))}
             </div>
-
-            <p className="muted" style={{ fontSize: 12, marginTop: 18 }}>
-              Delegate trend will appear here once history is tracked.
-            </p>
           </aside>
     </>
   );
