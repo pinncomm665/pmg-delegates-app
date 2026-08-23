@@ -76,7 +76,7 @@ export default function BriefView({ profile, delegateId, ret }: { profile: Conta
       <BriefPoller delegateId={delegateId} status={status} />
       <div className="section-head">
         <div>
-          <h3 className="section-title">Background notes</h3>
+          <p className="section-title">Background notes</p>
           <p className="section-sub">
             Attend-value research — why invite them to this summit.
             {profile?.generated_at ? ` · updated ${new Date(profile.generated_at).toLocaleDateString()}` : ""}

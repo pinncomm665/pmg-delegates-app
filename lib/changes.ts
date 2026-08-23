@@ -10,20 +10,20 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import type { AppUser } from "./session";
 import { RATE_GUARD_LIMIT, RATE_GUARD_WINDOW_MIN } from "./policy";
 
-// Allowed `kind` values (DB CHECK constraint): email, phone, role, stage,
-// stage_revert, logistics, registration, company, company_new, attach, brief,
-// promo, other. Delegates use `registration` for RegistrationForm saves.
+// Allowed `kind` values — the full DB CHECK list (contact_change_requests.kind):
+// email, phone, role, stage, stage_revert, logistics, registration, company,
+// company_new, attach, brief, promo, other.
 export type ChangeKind =
   | "stage"
   | "stage_revert"
   | "logistics"
-  | "registration"
   | "phone"
   | "email"
   | "company"
   | "company_new"
   | "attach"
   | "role"
+  | "registration"
   | "brief"
   | "promo"
   | "other";

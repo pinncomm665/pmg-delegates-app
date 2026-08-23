@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requireUser } from "@/lib/session";
+import { requireUser, isAdmin, isReviewer } from "@/lib/session";
 import { getDelegate, getEnrolments, getContactProfile, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
 import EmailHistory from "./EmailHistory";
 import ProfileTabs from "./ProfileTabs";
@@ -10,7 +10,8 @@ import InstantlyHistory from "./InstantlyHistory";
 import Avatar from "../../Avatar";
 import Shell from "../../Shell";
 import Breadcrumb from "../../Breadcrumb";
-import { updateStatus } from "./actions";
+import { updateStatus, flagRole } from "./actions";
+import { emailStatusOf } from "@/lib/emailstatus";
 import ContactDetails from "./ContactDetails";
 import BriefView from "./BriefView";
 import RemoveDelegateDialog from "./RemoveDelegateDialog";
@@ -19,6 +20,13 @@ import { getContactActivity } from "@/lib/changes";
 import { canEdit, NO_ACCESS_MSG } from "@/lib/policy";
 
 export const dynamic = "force-dynamic";
+
+function fmtDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
 
 export default async function DelegateDetail({
   params,
@@ -40,6 +48,8 @@ export default async function DelegateDetail({
     c.id ? getContactActivity(c.id) : Promise.resolve([]),
   ]);
   const editable = canEdit(user, { eventId: d.event_id, edition: d.event_edition });
+  const companyName = companyDisplay(c.company?.name ?? c.company_name_submitted) ?? null;
+  const stageUpdated = fmtDate(d.stage_updated_at);
 
   return (
     <Shell user={user}>
@@ -96,35 +106,54 @@ export default async function DelegateDetail({
             contact={
               <ContactDetails
                 delegateId={d.id}
-                ret={ret}
-                editable={editable}
-                companyName={companyDisplay(c.company?.name ?? c.company_name_submitted) ?? null}
+                isReviewer={isReviewer(user)}
                 contact={{
+                  id: c.id ?? null,
                   full_name_clean: c.full_name_clean ?? null,
                   first_name_clean: c.first_name_clean ?? null,
                   last_name_clean: c.last_name_clean ?? null,
                   job_title: c.job_title ?? null,
+                  company_name: companyName,
                   email: c.email ?? null,
+                  email_status: c.email ? emailStatusOf(c) : null,
                   personal_email: c.personal_email ?? null,
-                  phone: c.phone ?? null,
-                  mobile: c.mobile ?? null,
                   office_phone: c.office_phone ?? null,
+                  mobile: c.mobile ?? c.phone ?? null,
                   other_phone: c.other_phone ?? null,
                   linkedin_url_canonical: c.linkedin_url_canonical ?? null,
-                  email_mv_result: c.email_mv_result ?? null,
-                  email_verified_status: c.email_verified_status ?? null,
-                  scrubby_result: c.scrubby_result ?? null,
                 }}
-              />
+              >
+                <details>
+                  <summary>Left the company or changed role? Flag it</summary>
+                  <form action={flagRole}>
+                    <input type="hidden" name="delegateId" value={d.id} />
+                    <input type="hidden" name="return" value={ret} />
+                    <div className="form-grid">
+                      <div className="field">
+                        <label htmlFor="flag-title">New job title</label>
+                        <input id="flag-title" className="input" name="newTitle" placeholder="Optional" />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="flag-company">New company</label>
+                        <input id="flag-company" className="input" name="newCompany" placeholder="Optional" />
+                      </div>
+                      <div className="span-2 form-actions">
+                        <button className="btn btn-sm" type="submit">Submit for review</button>
+                        <p className="help">Goes to the admin queue. The record is not changed until approved.</p>
+                      </div>
+                    </div>
+                  </form>
+                </details>
+              </ContactDetails>
             }
             history={
               <div className="grid2">
                 <div>
-                  <h3 className="section-title" style={{ marginBottom: 12 }}>Email history</h3>
+                  <p className="section-title" style={{ marginBottom: 12 }}>Email history</p>
                   <EmailHistory email={c.email ?? c.personal_email ?? null} />
                 </div>
                 <div>
-                  <h3 className="section-title" style={{ marginBottom: 12 }}>Instantly history</h3>
+                  <p className="section-title" style={{ marginBottom: 12 }}>Instantly history</p>
                   <InstantlyHistory
                     email={c.email ?? c.personal_email ?? null}
                     enrolments={enrolments}
@@ -133,44 +162,42 @@ export default async function DelegateDetail({
               </div>
             }
             registration={
-              <div className="form-stack">
-                <section className="fieldset" role="group" aria-labelledby="fs-stage">
-                  <h3 className="section-title" id="fs-stage">Stage</h3>
-                  <form action={updateStatus} className="stage-row">
-                    <input type="hidden" name="delegateId" value={d.id} />
-                    <input type="hidden" name="return" value={ret} />
-                    <label htmlFor="stage-select" className="cd-label">Stage</label>
-                    <select id="stage-select" name="stage" className="stage-select" defaultValue={(d.stage ?? "identified").toLowerCase()} disabled={!editable}>
+              <div className="fieldset-stack">
+                <form action={updateStatus} className="field" style={{ maxWidth: 460 }}>
+                  <input type="hidden" name="delegateId" value={d.id} />
+                  <input type="hidden" name="return" value={ret} />
+                  <label htmlFor="stage-select">Stage</label>
+                  <div className="stage-row">
+                    <select
+                      id="stage-select"
+                      name="stage"
+                      className="stage-select"
+                      defaultValue={(d.stage ?? "identified").toLowerCase()}
+                      aria-label={`Stage for ${c.full_name_clean ?? "delegate"}`}
+                    >
                       {STAGES.map((s) => (
                         <option key={s.value} value={s.value}>{s.label}</option>
                       ))}
                     </select>
-                    <button className="btn btn-primary" type="submit" disabled={!editable}>Save</button>
-                  </form>
-                  <p className="help">
-                    {d.stage_updated_at
-                      ? `Last updated ${new Date(d.stage_updated_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}.`
-                      : "Not updated yet."}{" "}
-                    Moving out of a secured stage (registered / confirmed / attended) goes to review.
-                  </p>
-                </section>
+                    <button className="btn btn-primary" type="submit">Save</button>
+                  </div>
+                  <p className="help">{stageUpdated ? `Last updated ${stageUpdated}.` : "Not updated yet."}</p>
+                </form>
 
                 <RegistrationForm d={d} ret={ret} />
 
-                {user.role === "admin" && (
+                {isAdmin(user) && (
                   <RemoveDelegateDialog delegateId={d.id} ret={ret} name={c.full_name_clean ?? "this delegate"} />
                 )}
               </div>
             }
             background={<BriefView profile={profile} delegateId={d.id} ret={ret} />}
             activity={
-              <div>
-                <div className="section-head">
-                  <div>
-                    <h3 className="section-title">Activity</h3>
-                    <p className="section-sub">Every change made to this contact through the team apps — who, when, what. Newest first.</p>
-                  </div>
-                </div>
+              <div style={{ maxWidth: 760 }}>
+                <p className="section-title">Activity</p>
+                <p className="section-sub" style={{ marginBottom: 12 }}>
+                  Every change made to this contact through the team apps — who, when, what. Pending rows are waiting in the review queue.
+                </p>
                 <ActivityList rows={activity} />
               </div>
             }

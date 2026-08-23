@@ -40,11 +40,12 @@ function Area({ name, label, value, placeholder }: { name: string; label: string
 }
 
 function Fieldset({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
-  const id = `fs-${title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
-    <section className="fieldset" role="group" aria-labelledby={id}>
-      <h3 className="section-title" id={id}>{title}</h3>
-      {sub && <p className="section-sub">{sub}</p>}
+    <section className="fieldset" aria-label={title}>
+      <div className="fieldset-head">
+        <p className="section-title">{title}</p>
+        {sub && <p className="section-sub">{sub}</p>}
+      </div>
       {children}
     </section>
   );
@@ -62,17 +63,20 @@ function fmtStamp(iso?: string | null) {
 // edit, shows the sticky "Save changes" bar, and disarms on submit / discard.
 export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: string }) {
   useDirtyGuard();
-  const [dirty, setLocalDirty] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const mark = (v: boolean) => { setLocalDirty(v); setDirty(v); };
+  const [dirty, setLocalDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const markDirty = () => { setSaving(false); if (!dirty) { setLocalDirty(true); setDirty(true); } };
+  const discard = () => { formRef.current?.reset(); setLocalDirty(false); setDirty(false); };
 
   return (
     <form
       ref={formRef}
       action={updateRegistration}
-      className="form-stack"
-      onChange={() => mark(true)}
-      onSubmit={() => mark(false)}
+      onChange={markDirty}
+      onSubmit={() => { setSaving(true); setDirty(false); }}
+      className="fieldset-stack"
     >
       <input type="hidden" name="delegateId" value={d.id} />
       <input type="hidden" name="return" value={ret} />
@@ -92,7 +96,7 @@ export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: stri
       <Fieldset title="Payment & invoice">
         <div className="form-grid">
           <div className="field">
-            <span className="field-label">Status</span>
+            <span className="help" style={{ fontSize: "var(--fs-sm)" }}>Status</span>
             <div className="check-row">
               <Check name="invoice_sent" label="Invoice sent" checked={d.invoice_sent} />
               <Check name="payment_received" label="Payment received" checked={d.payment_received} />
@@ -106,9 +110,8 @@ export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: stri
               </p>
             )}
           </div>
-          <div>
+          <div className="fieldset-stack">
             <Field name="payment_amount" label="Payment amount (USD)" type="number" value={d.payment_amount} placeholder="0.00" />
-            <div style={{ height: 16 }} />
             <Field name="complimentary_reason" label="Complimentary reason" value={d.complimentary_reason} placeholder="e.g. Speaker guest / VIP invite" />
           </div>
         </div>
@@ -121,17 +124,13 @@ export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: stri
       </Fieldset>
 
       {dirty && (
-        <div className="save-bar" role="status">
-          <span>Unsaved changes</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => { formRef.current?.reset(); mark(false); }}
-            >
-              Discard
+        <div className="save-bar" role="region" aria-label="Unsaved changes">
+          <span className="save-bar-msg">Unsaved changes</span>
+          <div className="form-actions">
+            <button className="btn btn-sm" type="button" onClick={discard} disabled={saving}>Discard</button>
+            <button className="btn btn-primary btn-sm" type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
             </button>
-            <button className="btn btn-primary btn-sm" type="submit">Save changes</button>
           </div>
         </div>
       )}
