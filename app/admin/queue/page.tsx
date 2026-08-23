@@ -1,13 +1,31 @@
-import { requireAdmin } from "@/lib/session";
+import Link from "next/link";
+import { requireUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import Shell from "../../Shell";
+import Breadcrumb from "../../Breadcrumb";
 import { approveRequest, rejectRequest, removeDelegateFromQueue, approveIntake, mergeIntake, rejectIntake } from "./actions";
 import { fetchPendingIntake } from "./intake";
 
 export const dynamic = "force-dynamic";
 
 export default async function QueuePage() {
-  const admin = await requireAdmin();
+  // Unauthenticated → redirect (requireUser); authenticated non-admin → 403
+  // card instead of a silent bounce.
+  const admin = await requireUser();
+  if (admin.role !== "admin") {
+    return (
+      <Shell user={admin}>
+        <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Review queue" }]} />
+        <div className="card section" role="alert" style={{ maxWidth: 460, marginTop: 14 }}>
+          <h2 style={{ margin: "0 0 6px", fontSize: "var(--fs-lg)" }}>You don’t have access to the review queue</h2>
+          <p className="muted" style={{ margin: "0 0 14px", fontSize: 13 }}>
+            The review queue is admin-only. Ask Syed if you need approvals rights.
+          </p>
+          <Link href="/delegates" className="btn">Back to delegates</Link>
+        </div>
+      </Shell>
+    );
+  }
   const sb = supabaseAdmin();
   const { data: pending } = await sb
     .from("contact_change_requests")
@@ -21,7 +39,8 @@ export default async function QueuePage() {
 
   return (
     <Shell user={admin}>
-        <h2 style={{ margin: "0 0 4px" }}>New contacts · intake</h2>
+        <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Review queue" }]} />
+        <h2 style={{ margin: "14px 0 4px", fontSize: "var(--fs-lg)" }}>New contacts · intake</h2>
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           New contacts submitted via Add Contact. Approve to insert as a new
           contact, Merge into an existing one, or Reject.
@@ -102,7 +121,7 @@ export default async function QueuePage() {
           </table>
         </div>
 
-        <h2 style={{ margin: "0 0 4px" }}>Change requests</h2>
+        <h2 style={{ margin: "0 0 4px", fontSize: "var(--fs-lg)" }}>Change requests</h2>
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           Field edits submitted by the team. Approve to apply.
         </p>
@@ -152,11 +171,7 @@ export default async function QueuePage() {
                       {r.delegate_id && (
                         <form action={removeDelegateFromQueue}>
                           <input type="hidden" name="id" value={r.id} />
-                          <button
-                            className="btn"
-                            type="submit"
-                            style={{ padding: "6px 10px", color: "#c0392b", borderColor: "#e0b4b4" }}
-                          >
+                          <button className="btn btn-danger btn-sm" type="submit">
                             Remove delegate
                           </button>
                         </form>

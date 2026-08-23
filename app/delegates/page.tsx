@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/session";
+import Breadcrumb from "../Breadcrumb";
 import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, STAGES, type SortKey } from "@/lib/data";
 import Shell from "../Shell";
 import DelegateSearch from "./DelegateSearch";
@@ -71,22 +71,22 @@ export default async function DelegatesPage({
 
   return (
     <Shell user={user}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 14px" }}>
-        <h2 style={{ margin: 0 }}>
-          <Link href="/dashboard" style={{ color: "var(--accent, #0f6e56)" }}>Home</Link>
-          <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
-          Delegates
-          <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
-          {searchParams.edition || "All"}
-          <span style={{ color: "var(--muted)", margin: "0 8px" }}>›</span>
-          {searchParams.status ? stageLabel(searchParams.status) : "All"}
-        </h2>
-        <div style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
-          <strong style={{ color: "var(--text)", fontSize: 15 }}>{total}</strong> delegate{total === 1 ? "" : "s"}
+      <div className="page-head">
+        <Breadcrumb
+          items={[
+            { label: "Home", href: "/dashboard" },
+            { label: "Delegates", href: "/delegates" },
+            { label: searchParams.edition || "All", href: searchParams.edition ? `/delegates?edition=${encodeURIComponent(searchParams.edition)}` : "/delegates" },
+            { label: searchParams.status ? stageLabel(searchParams.status) : "All" },
+          ]}
+        />
+        <div className="page-head-aside">
+          <span style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
+            <strong style={{ color: "var(--text)", fontSize: 15 }}>{total}</strong> delegate{total === 1 ? "" : "s"}
+          </span>
         </div>
       </div>
 
-      <style>{`.flt summary{list-style:none}.flt summary::-webkit-details-marker{display:none}`}</style>
       <form
         method="get"
         className="card section flt"
