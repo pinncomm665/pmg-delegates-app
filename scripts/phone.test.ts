@@ -20,6 +20,11 @@ assert.equal(e164(normalizePhone("353868385969", {})), "+353868385969");
 assert.ok("error" in normalizePhone("255", { countryIso: "TZ" }), "bare country code → error");
 assert.ok("error" in normalizePhone("8035358808", { editionCountry: "4WARD MENA 2027" }), "region edition → no country → error");
 assert.ok("error" in normalizePhone("", { countryIso: "NG" }), "empty → error");
+// Hint-strictness (bulk audit 2026-08: 5/385 wrong-country guesses)
+assert.ok("error" in normalizePhone("01157530120", { editionCountry: "VERIFY Saudi Arabia 2026" }), "UK landline, edition-only SA → error (no isPossible fallback)");
+assert.ok("error" in normalizePhone("09177072559", { editionCountry: "VERIFY Indonesia 2026" }), "PH mobile, edition-only ID → error (ID fixed-line match rejected)");
+assert.equal(e164(normalizePhone("0580000040", { editionCountry: "VERIFY Saudi Arabia 2026" })), "+966580000040");
+assert.equal(e164(normalizePhone("02070502062", { countryIso: "GB" })), "+442070502062");
 assert.equal(countryIsoFromEdition("VERIFY Saudi Arabia 2026"), "SA");
 assert.equal(countryIsoFromEdition("4WARD MENA 2027"), null);
 assert.equal(formatPhone("+2348035358808"), "+234 803 535 8808");
