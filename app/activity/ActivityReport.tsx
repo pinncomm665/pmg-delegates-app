@@ -7,6 +7,7 @@ import {
   ACTIVITY_TYPES,
   ACTIVITY_LIST_FALLBACK,
   SUMMARY_PERIODS,
+  ALL_OWNERS_PARAM,
   type ActivityFeedRow,
   type ActivityOwner,
   type ActivitySummary,
@@ -15,7 +16,8 @@ import {
 import AttachmentChips from "../AttachmentChips";
 
 // Activity Report — client half: the sticky filter bar (search · type chips ·
-// owner · date range · sort), the owner × type summary matrix, the table
+// owner · date range · sort), the owner × type summary matrix (tracked team
+// only — lib/activityOwners.ts), the table
 // (desktop) / cards (≤640px) and the pager. Every control writes the URL
 // (router.replace) so the server re-queries; search is debounced 200 ms.
 
@@ -214,7 +216,7 @@ export default function ActivityReport({
         <div className="section-head">
           <div>
             <p id="ar-sum-title" className="section-title">Activity summary</p>
-            <p className="section-sub">Touches per account owner · {periodLabel}. Click a cell to filter the feed below.</p>
+            <p className="section-sub">Touches per account owner · tracked team · {periodLabel}. Click a cell to filter the feed below.</p>
           </div>
           <div className="ar-periods" role="group" aria-label="Summary period">
             {SUMMARY_PERIODS.map((p) => (
@@ -247,7 +249,7 @@ export default function ActivityReport({
               <tbody>
                 {summary.rows.map((o) => {
                   const key = o.owner_email ?? "__system__";
-                  const label = o.owner_email ? (o.owner_name ?? o.owner_email) : "Unassigned / System";
+                  const label = o.owner_name ?? o.owner_email ?? "Unassigned / System";
                   const onOwner = !!o.owner_email && filters.owner === o.owner_email;
                   return (
                     <tr key={key} className={onOwner ? "is-on" : undefined}>
@@ -318,9 +320,10 @@ export default function ActivityReport({
             className="ar-search"
           />
           <select value={filters.owner} onChange={(e) => apply({ owner: e.target.value })} aria-label="Owner" className="ar-owner">
-            <option value="">All owners</option>
+            <option value="">All tracked</option>
             {owners.map((o) => <option key={o.email} value={o.email}>{ownerLabel(o)}</option>)}
-            {filters.owner && !owners.some((o) => o.email === filters.owner) && <option value={filters.owner}>{filters.owner}</option>}
+            {viewerElevated && <option value={ALL_OWNERS_PARAM}>Everyone (incl. system)</option>}
+            {filters.owner && filters.owner !== ALL_OWNERS_PARAM && !owners.some((o) => o.email === filters.owner) && <option value={filters.owner}>{filters.owner}</option>}
           </select>
           <label className="ar-date">
             <span className="muted">From</span>

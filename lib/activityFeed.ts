@@ -1,5 +1,14 @@
 import { supabaseAdmin } from "./supabaseAdmin";
 import { getAttachmentsForFeed, type NoteAttachment, type TranscriptStatus } from "./notes";
+import {
+  ALL_OWNERS_PARAM,
+  TRACKED_OWNERS,
+  isTrackedOwnerEmail,
+  ownerAliases,
+  resolveTrackedOwner,
+  trackedOwnerOrFilter,
+  type TrackedOwner,
+} from "./activityOwners";
 
 // Activity Report — reads the pmg-agent VIEW `public.team_activity_feed`
 // (mig 217) with the service key. One row per team touch across ALL contacts
@@ -52,6 +61,9 @@ export type ActivityFeedRow = {
 export type ActivityFeedFilters = {
   q?: string;
   activity?: string[];
+  // Tracked owner's canonical email (any alias mailbox rolls up), "" = all
+  // tracked owners (default), or ALL_OWNERS_PARAM ("all") = no owner filter
+  // at all (admin escape hatch — shows system/untracked rows too).
   owner?: string;
   since?: string; // YYYY-MM-DD (inclusive, local day start)
   until?: string; // YYYY-MM-DD (inclusive, local day end)
@@ -119,7 +131,18 @@ export async function getActivityFeed(filters: ActivityFeedFilters): Promise<Act
 
     const types = (filters.activity ?? []).filter(isActivityType);
     if (types.length) query = query.in("activity", types);
-    if (filters.owner) query = query.eq("owner_email", filters.owner);
+    // Owner scoping — default = tracked team only (see lib/activityOwners.ts).
+    const owner = String(filters.owner ?? "").trim().toLowerCase();
+    if (owner === ALL_OWNERS_PARAM) {
+      // no owner filter: every row, including system-originated ones
+    } else if (owner) {
+      const canon = ownerAliases[owner];
+      const tracked = canon ? TRACKED_OWNERS.find((o) => o.email === canon) : null;
+      if (tracked) query = query.or(trackedOwnerOrFilter([tracked]));
+      else query = query.eq("owner_email", owner); // untracked mailbox typed by hand: exact match
+    } else {
+      query = query.or(trackedOwnerOrFilter());
+    }
     const since = filters.since ? dayStart(filters.since) : null;
     const until = filters.until ? dayEnd(filters.until) : null;
     if (since) query = query.gte("at", since);
@@ -187,36 +210,13 @@ export async function getActivityFeed(filters: ActivityFeedFilters): Promise<Act
   }
 }
 
-// Distinct owners seen in the feed (cheap: one bounded pull over the window,
-// deduped here — PostgREST has no DISTINCT).
-export async function getActivityOwners(opts: { since?: string; markets?: string[] | null } = {}): Promise<ActivityOwner[]> {
-  if (viewMissing) return [];
-  try {
-    const sb = supabaseAdmin();
-    let query = sb
-      .from("team_activity_feed")
-      .select("owner_email, owner_name")
-      .not("owner_email", "is", null)
-      .order("at", { ascending: false })
-      .limit(1000);
-    const since = opts.since ? dayStart(opts.since) : null;
-    if (since) query = query.gte("at", since);
-    if (opts.markets && opts.markets.length) {
-      query = query.or(opts.markets.map((m) => `event_edition.ilike.%${m}%`).join(","));
-    }
-    const { data, error } = await query;
-    if (error) { if (isMissing(error)) viewMissing = true; return []; }
-    const seen = new Map<string, ActivityOwner>();
-    for (const r of (data ?? []) as any[]) {
-      const email = String(r.owner_email ?? "").toLowerCase();
-      if (!email || seen.has(email)) continue;
-      seen.set(email, { email, name: r.owner_name ?? null });
-    }
-    return Array.from(seen.values()).sort((a, b) => (a.name ?? a.email).localeCompare(b.name ?? b.email));
-  } catch {
-    return [];
-  }
+// The tracked account owners, in the fixed order from lib/activityOwners.ts.
+// (Was a distinct query over the feed; the report now tracks a fixed team.)
+export async function getActivityOwners(_opts: { since?: string; markets?: string[] | null } = {}): Promise<ActivityOwner[]> {
+  return TRACKED_OWNERS.map((o) => ({ email: o.email, name: o.name }));
 }
+export { ALL_OWNERS_PARAM, TRACKED_OWNERS, isTrackedOwnerEmail };
+export type { TrackedOwner };
 
 // ── Activity summary matrix (owner × type counts for a period) ──────────────
 export type ActivitySummaryRow = { owner_email: string | null; owner_name: string | null; counts: Record<string, number>; total: number };
@@ -252,13 +252,16 @@ export async function getActivitySummary(opts: { since?: string; until?: string;
   const sb = supabaseAdmin();
   const since = opts.since ? dayStart(opts.since) : null;
   const until = opts.until ? dayEnd(opts.until) : null;
+  // Exactly one row per tracked owner, in the fixed order; rows belonging to
+  // nobody tracked (system sources, other users) are not counted.
   const byOwner = new Map<string, ActivitySummaryRow>();
+  for (const o of TRACKED_OWNERS) byOwner.set(o.email, { owner_email: o.email, owner_name: o.name, counts: {}, total: 0 });
   const totals: Record<string, number> = {};
   let grand = 0;
   let max = 0;
   try {
     for (let from = 0; from < SUMMARY_MAX_ROWS; from += SUMMARY_PAGE) {
-      let query = sb.from("team_activity_feed").select("owner_email, owner_name, activity");
+      let query = sb.from("team_activity_feed").select("owner_email, owner_name, activity").or(trackedOwnerOrFilter());
       if (since) query = query.gte("at", since);
       if (until) query = query.lte("at", until);
       if (opts.markets && opts.markets.length) {
@@ -271,14 +274,10 @@ export async function getActivitySummary(opts: { since?: string; until?: string;
       }
       const rows = (data ?? []) as any[];
       for (const r of rows) {
-        const email = r.owner_email ? String(r.owner_email).toLowerCase() : "";
-        const key = email || "__system__";
+        const tracked = resolveTrackedOwner(r.owner_email ?? null, r.owner_name ?? null);
+        if (!tracked) continue;
         const type = isActivityType(String(r.activity ?? "")) ? String(r.activity) : "Other";
-        let row = byOwner.get(key);
-        if (!row) {
-          row = { owner_email: email || null, owner_name: r.owner_name ?? null, counts: {}, total: 0 };
-          byOwner.set(key, row);
-        } else if (!row.owner_name && r.owner_name) row.owner_name = r.owner_name;
+        const row = byOwner.get(tracked.email)!;
         row.counts[type] = (row.counts[type] ?? 0) + 1;
         row.total += 1;
         totals[type] = (totals[type] ?? 0) + 1;
@@ -290,11 +289,6 @@ export async function getActivitySummary(opts: { since?: string; until?: string;
   } catch (e: any) {
     if (isMissing(e)) { viewMissing = true; return { ...empty, available: false }; }
   }
-  const list = Array.from(byOwner.values()).sort((a, b) => {
-    // Named owners first (by total desc), the system/unassigned bucket last.
-    if (!a.owner_email && b.owner_email) return 1;
-    if (a.owner_email && !b.owner_email) return -1;
-    return b.total - a.total;
-  });
-  return { rows: list, totals, grandTotal: grand, max, available: true };
+  // Fixed tracked order (Map preserves insertion order); zeros are shown as "·".
+  return { rows: Array.from(byOwner.values()), totals, grandTotal: grand, max, available: true };
 }
