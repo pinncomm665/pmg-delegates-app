@@ -123,6 +123,7 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
         contact_id: contactId,
         summary_md: prev?.summary_md ?? null,
         facts: prev?.facts ?? {},
+        timeline: prev?.timeline ?? [],
         status: "pending",
         error: null,
         generated_at: prev?.generated_at ?? null,
