@@ -23,6 +23,7 @@ export type Row = {
   email?: string | null;
   phone?: string | null;
   linkedin?: string | null;
+  owner?: string | null;   // owner first name (null = unassigned)
 };
 type Campaign = { id: string; name: string; active: boolean };
 type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
@@ -48,13 +49,17 @@ const STAGE_TONE: Record<string, "is-positive" | "is-negative"> = {
 };
 
 // Optional columns (Email · Phone · LinkedIn) — persisted in localStorage.
-type OptCol = "email" | "phone" | "linkedin";
+type OptCol = "owner" | "email" | "phone" | "linkedin";
+const OPT_COL_KEYS: OptCol[] = ["owner", "email", "phone", "linkedin"];
+const DEFAULT_COLS: OptCol[] = ["owner"]; // Owner is on by default
 const OPT_COLS: { k: OptCol; label: string }[] = [
+  { k: "owner", label: "Owner" },
   { k: "email", label: "Email" },
   { k: "phone", label: "Phone" },
   { k: "linkedin", label: "LinkedIn" },
 ];
-const COLS_KEY = "pmg-delegates-cols";
+const COLS_KEY = "pmg-delegates-cols-v2"; // v2: Owner column defaults ON
+const COLS_KEY_LEGACY = "pmg-delegates-cols";
 const PAGE_SIZES = [50, 100, 250];
 
 function linkedinSlug(url: string): string {
@@ -94,14 +99,18 @@ export default function DelegatesList({
   const [modal, setModal] = useState(false);
   const [data, setData] = useState<Row[]>(rows);
   const [saving, setSaving] = useState<string | null>(null);
-  const [cols, setCols] = useState<Set<OptCol>>(new Set());
+  const [cols, setCols] = useState<Set<OptCol>>(new Set(DEFAULT_COLS));
   // rows change when the server sends a new page → reset local edits + selection.
   useEffect(() => { setData(rows); setSel(new Set()); setSelAllNote(null); }, [rows]);
   // Optional columns: restore from localStorage once.
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(COLS_KEY);
-      if (raw) setCols(new Set((JSON.parse(raw) as string[]).filter((k): k is OptCol => ["email", "phone", "linkedin"].includes(k))));
+      const parse = (raw: string | null) => raw ? (JSON.parse(raw) as string[]).filter((k): k is OptCol => OPT_COL_KEYS.includes(k as OptCol)) : null;
+      const v2 = parse(window.localStorage.getItem(COLS_KEY));
+      if (v2) { setCols(new Set(v2)); return; }
+      // legacy (pre-owner) preference → carry over with Owner added once
+      const legacy = parse(window.localStorage.getItem(COLS_KEY_LEGACY));
+      if (legacy) setCols(new Set([...DEFAULT_COLS, ...legacy]));
     } catch {}
   }, []);
   const toggleCol = (k: OptCol) =>
@@ -254,8 +263,8 @@ export default function DelegatesList({
     </>
   );
 
-  const showEmail = cols.has("email"), showPhone = cols.has("phone"), showLinkedin = cols.has("linkedin");
-  const colCount = 6 + (showEmail ? 1 : 0) + (showPhone ? 1 : 0) + (showLinkedin ? 1 : 0);
+  const showOwner = cols.has("owner"), showEmail = cols.has("email"), showPhone = cols.has("phone"), showLinkedin = cols.has("linkedin");
+  const colCount = 6 + (showOwner ? 1 : 0) + (showEmail ? 1 : 0) + (showPhone ? 1 : 0) + (showLinkedin ? 1 : 0);
 
   return (
     <>
@@ -298,6 +307,7 @@ export default function DelegatesList({
               {showPhone && <th>Phone</th>}
               {showLinkedin && <th>LinkedIn</th>}
               <Th k="stage">Status</Th>
+              {showOwner && <th>Owner</th>}
             </tr>
           </thead>
           <tbody>
@@ -323,6 +333,7 @@ export default function DelegatesList({
                 <td>
                   <StageSelect r={r} />
                 </td>
+                {showOwner && <td className="muted" style={{ whiteSpace: "nowrap" }}>{r.owner ?? <span style={{ opacity: 0.6 }}>Unassigned</span>}</td>}
               </tr>
             ))}
             {data.length === 0 && (
@@ -342,7 +353,7 @@ export default function DelegatesList({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <Link href={detailHref(r.id)} className="sp-name">{r.name}</Link>
                 <div className="sp-sub">{r.job_title}{r.company && r.company !== "—" ? ` · ${r.company}` : ""}</div>
-                <div className="sp-edition">{r.edition}</div>
+                <div className="sp-edition">{r.edition}{showOwner ? <> · Owner: {r.owner ?? "Unassigned"}</> : null}</div>
                 <div className="sp-glyphs" aria-label="Contact data available">
                   <span className={r.email ? "on" : undefined} title={r.email ? "Has email" : "No email"}>{r.email ? "✓" : "–"} email</span>
                   <span className={r.phone ? "on" : undefined} title={r.phone ? "Has phone" : "No phone"}>{r.phone ? "✓" : "–"} phone</span>
