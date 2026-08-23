@@ -7,6 +7,7 @@ import DelegateSearch from "./DelegateSearch";
 import DelegatesList from "./DelegatesList";
 import ExportButtons from "./ExportButtons";
 import StageTabs from "./StageTabs";
+import FiltersSheet from "./FiltersSheet";
 import { companyDisplay } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,8 @@ export default async function DelegatesPage({
     searchParams.has_phone,
     searchParams.has_linkedin,
   ].filter((v) => v === "1").length;
+  // Brand / edition / has_* filters in force — the phone shell's "Filters (n)".
+  const activeFilterCount = extraCount + (searchParams.brand ? 1 : 0) + (searchParams.edition ? 1 : 0);
 
   // Same view without the search term (the removable "q" chip's target).
   const withoutQ = new URLSearchParams(filterQs);
@@ -136,8 +139,30 @@ export default async function DelegatesPage({
         {pageSize !== DEFAULT_PAGE_SIZE && <input type="hidden" name="pageSize" value={pageSize} />}
         {searchParams.status && <input type="hidden" name="status" value={searchParams.status} />}
 
-        {/* Row 1 — filters + More + Apply (one row on desktop, stacked on mobile) */}
-        <div className="flt-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {/* ONE DOM, two layouts (see FiltersSheet + globals.css .flt-*):
+            desktop = row 1 selects/More/Apply/Reset + row 2 search/exports;
+            phone   = sticky [search][Filters (n)] row + bottom sheet. */}
+        <FiltersSheet
+          activeCount={activeFilterCount}
+          extraCount={extraCount}
+          showReset={anyFilter}
+          resetHref="/delegates"
+          search={<DelegateSearch initialQ={q ?? ""} returnQs={returnQs} />}
+          exportButtons={<ExportButtons filterQs={filterQs} count={total} />}
+          extras={
+            <>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
+                <input type="checkbox" name="has_valid_email" value="1" defaultChecked={searchParams.has_valid_email === "1"} style={{ width: "auto" }} /> Has valid email
+              </label>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
+                <input type="checkbox" name="has_phone" value="1" defaultChecked={searchParams.has_phone === "1"} style={{ width: "auto" }} /> Has phone
+              </label>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
+                <input type="checkbox" name="has_linkedin" value="1" defaultChecked={searchParams.has_linkedin === "1"} style={{ width: "auto" }} /> Has LinkedIn
+              </label>
+            </>
+          }
+        >
           <select name="brand" defaultValue={searchParams.brand ?? ""} style={{ flex: 1, minWidth: 0 }} aria-label="Brand">
             <option value="">All events</option>
             {options.brands.map((b) => (
@@ -161,40 +186,7 @@ export default async function DelegatesPage({
               </optgroup>
             )}
           </select>
-
-          <details className="flt-more" style={{ position: "relative" }}>
-            <summary className="btn" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>
-              More{extraCount > 0 ? ` · ${extraCount}` : ""}
-            </summary>
-            <div
-              className="card"
-              style={{ position: "absolute", zIndex: 10, top: "calc(100% + 6px)", right: 0, padding: 12, minWidth: 190, display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 6px 24px rgba(0,0,0,0.12)" }}
-            >
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
-                <input type="checkbox" name="has_valid_email" value="1" defaultChecked={searchParams.has_valid_email === "1"} style={{ width: "auto" }} /> Has valid email
-              </label>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
-                <input type="checkbox" name="has_phone" value="1" defaultChecked={searchParams.has_phone === "1"} style={{ width: "auto" }} /> Has phone
-              </label>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, margin: 0 }}>
-                <input type="checkbox" name="has_linkedin" value="1" defaultChecked={searchParams.has_linkedin === "1"} style={{ width: "auto" }} /> Has LinkedIn
-              </label>
-            </div>
-          </details>
-
-          <button className="btn btn-primary" type="submit" style={{ whiteSpace: "nowrap" }}>Apply</button>
-          {anyFilter && (
-            <Link href="/delegates" className="btn" style={{ whiteSpace: "nowrap", textDecoration: "none" }}>Reset</Link>
-          )}
-        </div>
-
-        {/* Row 2 — ONE search: typeahead + Enter-to-filter (this is the form's q) */}
-        <div className="flt-row" style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
-            <DelegateSearch initialQ={q ?? ""} returnQs={returnQs} />
-          </div>
-          <ExportButtons filterQs={filterQs} count={total} />
-        </div>
+        </FiltersSheet>
       </form>
 
       {/* Stage tabs — per edition, or aggregate counts in the all-editions view */}
