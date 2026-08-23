@@ -24,6 +24,35 @@ function addressOf(v: string | null): string | null {
   return a.includes("@") ? a : null;
 }
 
+// "Name <a@b.com>" → "Name"; bare address → its local part.
+function displayNameOf(v: string | null): string | null {
+  if (!v) return null;
+  const m = v.match(/^\s*"?([^"<]+?)"?\s*<[^>]+>/);
+  if (m && m[1].trim()) return m[1].trim();
+  const a = addressOf(v);
+  return a ? a.split("@")[0] : v.trim() || null;
+}
+
+function firstNameOf(v: string | null): string | null {
+  const n = displayNameOf(v);
+  if (!n) return null;
+  return n.split(/[\s._]+/).filter(Boolean)[0] ?? n;
+}
+
+// Per-row attribution. Outbound (from a grouppmg.com mailbox) → SENT by <first
+// name>. Inbound from one of the CONTACT's addresses → REPLIED. Inbound from
+// anyone else (another recipient on a group thread) → THREAD · <name>, muted —
+// it is NOT this contact replying.
+type Kind = "sent" | "replied" | "thread";
+function classify(m: Msg, contactAddrs: Set<string>): { kind: Kind; who: string | null } {
+  const from = addressOf(m.from)?.toLowerCase() ?? null;
+  if (m.direction === "outbound" || (from && from.endsWith("@grouppmg.com"))) {
+    return { kind: "sent", who: firstNameOf(m.from) };
+  }
+  if (from && contactAddrs.has(from)) return { kind: "replied", who: null };
+  return { kind: "thread", who: displayNameOf(m.from) };
+}
+
 function fmt(d: string | null) {
   if (!d) return "";
   const t = new Date(d);
@@ -40,6 +69,7 @@ function fmt(d: string | null) {
 export default function EmailHistory({ emails }: { emails: Array<string | null | undefined> }) {
   const list = Array.from(new Set(emails.map((e) => (e ?? "").trim().toLowerCase()).filter((e) => e.includes("@"))));
   const key = list.join(",");
+  const contactAddrs = new Set(list);
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error"; reason: string }
@@ -87,28 +117,42 @@ export default function EmailHistory({ emails }: { emails: Array<string | null |
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {state.messages.map((m, i) => {
-        const inbound = m.direction === "inbound";
+        const { kind, who } = classify(m, contactAddrs);
+        const inbound = kind !== "sent";
+        const accent = kind === "replied" ? "var(--accent)" : kind === "sent" ? "#7a776f" : "#a8a49b";
+        const bar = kind === "replied" ? "var(--accent)" : kind === "sent" ? "#c9c6bd" : "#e3e1da";
+        const label =
+          kind === "sent"
+            ? `↗ Sent${who ? ` by ${who}` : ""}`
+            : kind === "replied"
+            ? "↘ Replied"
+            : `Thread · ${who ?? "other recipient"}`;
         return (
           <div
             key={i}
             style={{
-              borderLeft: `3px solid ${inbound ? "var(--accent)" : "#c9c6bd"}`,
+              borderLeft: `3px solid ${bar}`,
               paddingLeft: 10,
             }}
           >
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <span
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
                   letterSpacing: 0.3,
                   textTransform: "uppercase",
-                  color: inbound ? "var(--accent)" : "#7a776f",
+                  color: accent,
                 }}
               >
-                {inbound ? "↘ Replied" : "↗ Sent"}
+                {label}
               </span>
               <span className="muted" style={{ fontSize: 12 }}>{fmt(m.date)}</span>
+              {kind === "thread" && (
+                <span className="muted" style={{ fontSize: 11, fontStyle: "italic" }}>
+                  another recipient on this thread
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
               {m.thread_id ? (
