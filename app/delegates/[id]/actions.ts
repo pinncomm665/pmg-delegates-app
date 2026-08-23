@@ -13,6 +13,7 @@ import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/
 import { normalizePhone } from "@/lib/phone";
 import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
 import { cleanNameFields } from "@/lib/nameClean";
+import { insertContactNote, isNoteChannel, fmtDuration, type NoteAttachment, type NoteChannel } from "@/lib/notes";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);
@@ -670,3 +671,55 @@ export async function updateLinkedin(delegateId: string, url: string): Promise<F
 }
 
 // Admin-only hard delete of the role row. Typed confirmation ("REMOVE") is
+
+// ── Log activity (manual WhatsApp / call / meeting / note) ──────────────────
+// Writes contact_notes (+ attachments) and a Tier-A 'note' change-log row.
+// Called from the LogActivity dialog (client) — returns a result instead of
+// redirecting so the dialog can show the error inline and toast on success.
+export type LogActivityInput = {
+  delegateId: string;
+  contactId: string;
+  channel: string;
+  text: string;
+  at: string;
+  attachments: NoteAttachment[];
+  ret?: string;
+};
+export async function logActivity(input: LogActivityInput): Promise<{ ok: true; message?: string } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const d = await getDelegate(String(input.delegateId));
+  if (!d) return { ok: false, error: "Delegate not found" };
+  if (!canEdit(user, { eventId: d.event_id, edition: d.event_edition })) return { ok: false, error: NO_ACCESS_MSG };
+  const contactId = String(input.contactId ?? d.contact?.id ?? "").toLowerCase();
+  if (!contactId || contactId !== String(d.contact?.id ?? "").toLowerCase()) return { ok: false, error: "Contact mismatch" };
+  const channel = isNoteChannel(String(input.channel)) ? (input.channel as NoteChannel) : "Note";
+  const attachments = Array.isArray(input.attachments)
+    ? input.attachments
+        .filter((a) => a && typeof a.path === "string" && a.path.startsWith(`contacts/${contactId}/`))
+        .slice(0, 20)
+        .map((a) => ({ name: String(a.name ?? "file").slice(0, 200), path: a.path, type: String(a.type ?? "application/octet-stream"), size: Number(a.size ?? 0), kind: a.kind === "voice" ? ("voice" as const) : ("file" as const), duration_s: typeof a.duration_s === "number" ? a.duration_s : undefined }))
+    : [];
+  let text = String(input.text ?? "").trim().slice(0, 4000);
+  if (!text) {
+    const v = attachments.find((a) => a.kind === "voice");
+    if (v) text = `Voice note (${fmtDuration(v.duration_s)})`;
+    else if (attachments.length) text = `${attachments.length} attachment${attachments.length === 1 ? "" : "s"}`;
+    else return { ok: false, error: "Add some text, a file or a voice note" };
+  }
+  const atMs = Date.parse(String(input.at ?? ""));
+  const at = Number.isNaN(atMs) ? new Date().toISOString() : new Date(Math.min(atMs, Date.now() + 60_000)).toISOString();
+
+  const res = await insertContactNote({ contactId, channel, text, at, authorEmail: user.email, attachments });
+  if (!res.ok) return { ok: false, error: res.error };
+
+  // Change log (Tier A). kind 'note' needs the widened CHECK (mig 217); fall
+  // back to 'other' + field 'note' on older schemas so the log row still lands.
+  const entry = { ...base(d), field: channel.toLowerCase(), current_value: null, proposed_value: text.slice(0, 500) + (attachments.length ? ` (+${attachments.length} attachment${attachments.length === 1 ? "" : "s"})` : "") };
+  const err = await logChange(user, { ...entry, kind: "note" });
+  if (err && /check|kind/i.test(err)) await logChange(user, { ...entry, kind: "other", field: `note:${channel.toLowerCase()}` });
+
+  revalidatePath(`/delegates/${d.id}`);
+  revalidatePath("/activity");
+  const degraded = res.degraded.length ? " (saved in compatibility mode)" : "";
+  return { ok: true, message: `${channel} logged${degraded}` };
+}

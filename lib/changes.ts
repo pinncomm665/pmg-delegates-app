@@ -26,6 +26,7 @@ export type ChangeKind =
   | "registration"
   | "brief"
   | "promo"
+  | "note"
   | "other";
 
 export type ChangeStatus = "pending" | "auto_applied" | "approved" | "rejected";
@@ -151,6 +152,7 @@ export const KIND_LABEL: Record<string, string> = {
   role: "Role / title",
   brief: "Brief",
   promo: "Promotion",
+  note: "Note",
   other: "Other",
 };
 

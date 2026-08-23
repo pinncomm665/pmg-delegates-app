@@ -9,6 +9,7 @@ export function viewItems(user: AppUser): NavItem[] {
     { href: "/delegates", label: "All delegates" },
     { href: "/add-contact", label: "Add Contact" },
     { href: "/my-changes", label: "My changes" },
+    { href: "/activity", label: "Activity Report" },
     ...(isReviewer(user) ? [{ href: "/admin/queue", label: "Review queue" }] : []),
   ];
 }

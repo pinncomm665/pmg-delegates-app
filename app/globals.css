@@ -686,3 +686,107 @@ select.input { padding-right: 32px; }
 .dialer-panel { position: fixed; right: 16px; bottom: 16px; z-index: 80; width: 380px; max-width: calc(100vw - 24px); height: 620px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.2); transition: opacity .25s, transform .25s, visibility .25s; }
 .dialer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 @media (max-width: 640px) { .dialer-panel { right: 12px; left: 12px; width: auto; bottom: calc(12px + env(safe-area-inset-bottom)); } }
+
+/* ── Detail header: quick actions next to the stage pill ───────────────────── */
+.sp-head-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.log-act-btn { gap: 6px; white-space: nowrap; }
+@media (max-width: 640px) { .sp-head-actions { width: 100%; justify-content: space-between; } }
+
+/* ── Log activity dialog ───────────────────────────────────────────────────── */
+.log-act textarea.input { resize: vertical; min-height: 84px; }
+.log-act-att { margin-top: var(--gap-2); display: flex; flex-direction: column; gap: 8px; }
+.log-act-att-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.log-act-att-row .btn { display: inline-flex; align-items: center; gap: 6px; }
+.log-act-rec { display: inline-flex; align-items: center; gap: 6px; }
+.log-act-dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: log-act-blink 1s steps(2, start) infinite; }
+@keyframes log-act-blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .log-act-dot { animation: none; } }
+.log-act-voice { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.log-act-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.log-act-files li { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.log-act-files .att-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) {
+  .log-act-att-row .btn, .log-act-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .log-act-actions { display: flex; }
+}
+
+/* ── Attachment chips (timeline rows, activity report) ─────────────────────── */
+.att-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.att-chip { text-decoration: none; font-weight: 500; max-width: 100%; }
+.att-chip .att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+a.att-chip:hover { color: var(--info); }
+.att-voice { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.att-audio { height: 30px; max-width: 260px; }
+.att-chips.is-compact .att-audio { max-width: 200px; height: 28px; }
+
+/* ── Activity Report (/activity) ──────────────────────────────────────────── */
+.ar-summary .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.ar-periods { display: flex; gap: 6px; flex-wrap: wrap; }
+.ar-chip { cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text); font-weight: 500; font-size: 12.5px; padding: 3px 10px; }
+.ar-chip:hover { border-color: var(--info); color: var(--info); }
+.ar-chip.is-on { background: var(--info); border-color: var(--info); color: #fff; }
+.ar-matrix-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border); border-radius: var(--radius); }
+.ar-matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 720px; }
+.ar-matrix th, .ar-matrix td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.ar-matrix thead th { font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em; background: var(--bg); position: sticky; top: 0; z-index: 1; }
+.ar-matrix th:first-child, .ar-matrix td:first-child { text-align: left; position: sticky; left: 0; z-index: 2; background: var(--card); box-shadow: 1px 0 0 var(--border); font-weight: 500; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.ar-matrix thead th:first-child { background: var(--bg); z-index: 3; }
+.ar-matrix tbody tr:hover td:not(.is-zero) { filter: brightness(0.97); }
+.ar-matrix tbody tr.is-on th:first-child { color: var(--info); }
+.ar-matrix tfoot th, .ar-matrix tfoot td { border-bottom: none; border-top: 1px solid var(--border); font-weight: 600; background: var(--bg); }
+.ar-matrix tfoot th:first-child { background: var(--bg); }
+.ar-matrix .ar-total { font-weight: 600; }
+.ar-matrix .ar-grand { color: var(--accent); }
+.ar-matrix .is-zero { color: var(--muted); opacity: .7; }
+.ar-matrix td.is-on { outline: 2px solid var(--info); outline-offset: -2px; }
+.ar-cell-btn { appearance: none; background: none; border: none; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; width: 100%; text-align: inherit; border-radius: 4px; }
+.ar-cell-btn:hover { text-decoration: underline; }
+.ar-owner-btn { text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ar-bar { position: sticky; top: 0; z-index: 30; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; background: var(--card); }
+.ar-bar-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ar-search { flex: 1 1 220px; min-width: 180px; }
+.ar-owner { flex: 0 1 220px; min-width: 140px; }
+.ar-date { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin: 0; }
+.ar-date input { width: auto; padding: 6px 8px; }
+.ar-sort { white-space: nowrap; }
+.ar-state { gap: 6px; }
+.ar-state .btn-spin { width: 10px; height: 10px; border-width: 1.5px; }
+.ar-types { gap: 6px; }
+/* Type palette — same tints as the timeline badges */
+.ar-type { font-weight: 600; font-size: 11px; }
+.ar-t-email { background: var(--hover); color: var(--text); }
+.ar-t-phone, .ar-t-meeting { background: var(--info-bg); color: var(--info); }
+.ar-t-linkedin { background: color-mix(in srgb, #0a66c2 14%, var(--card)); color: #0a66c2; }
+.ar-t-whatsapp { background: color-mix(in srgb, #25d366 18%, var(--card)); color: #128c4a; }
+.ar-t-note, .ar-t-other { background: var(--hover); color: var(--muted); }
+.ar-t-registration { background: var(--success-bg); color: var(--success); }
+.ar-t-stage { background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); }
+.ar-chip.ar-type { border: 1px solid transparent; font-size: 12px; padding: 3px 10px; }
+.ar-chip.ar-type:not(.is-on) { opacity: .8; }
+.ar-chip.ar-type:hover { opacity: 1; border-color: currentColor; }
+.ar-chip.ar-type.is-on { opacity: 1; outline: 2px solid var(--info); outline-offset: -1px; }
+
+.ar-table td { vertical-align: top; }
+.ar-date-cell { white-space: nowrap; font-size: 13px; }
+.ar-contact { font-weight: 500; }
+.ar-company { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-owner-cell { white-space: nowrap; }
+.ar-summary-cell { max-width: 520px; min-width: 200px; }
+.ar-sum { appearance: none; background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--muted); text-align: left; cursor: pointer; display: block; width: 100%; line-height: 1.45; font-size: 13px; overflow-wrap: anywhere; }
+.ar-sum strong { color: var(--text); font-weight: 600; }
+.ar-sum.is-clamped { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ar-sum:hover { color: var(--text); }
+.ar-card-top { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.ar-card-owner { margin-left: auto; }
+.ar-card-who { margin-top: 6px; font-size: 14px; }
+.ar-card-who .sp-sub { display: inline; }
+.ar-card-sum { margin-top: 4px; }
+.ar-card-sum .ar-sum { white-space: normal; }
+@media (max-width: 760px) {
+  .ar-bar { top: var(--topbar-h); z-index: 35; }
+  .ar-bar-row .ar-date { flex: 1 1 45%; }
+  .ar-bar-row .ar-date input { flex: 1; }
+  .ar-owner { flex: 1 1 100%; }
+  .ar-sort { flex: 1 1 auto; }
+}

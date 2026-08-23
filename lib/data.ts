@@ -570,3 +570,4 @@ export async function getContactSummary(contactId: string): Promise<import("./co
     return null;
   }
 }
+export * from "./activityFeed";

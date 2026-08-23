@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContactSummary, TimelineItem } from "@/lib/contactSummary";
+import type { ContactNoteLite, NoteAttachment } from "@/lib/notes";
+import AttachmentChips from "../../AttachmentChips";
 
 // Activity timeline — the "Contact History" tab. Renders contact_summaries.timeline
 // (newest first, ≤ 40 items) from the SAME row the AI summary card uses, so it shares
@@ -19,9 +21,7 @@ import type { ContactSummary, TimelineItem } from "@/lib/contactSummary";
 const POLL_MS = 10_000;
 const POLL_MAX_TICKS = 12;
 const STATUS_URL = (id: string) => `/api/contact-summary/status?contact_id=${encodeURIComponent(id)}`;
-const gmailThreadUrl = (id: string) => `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(id)}`;
-// Same deep link the sales app's call activity uses (app.justcall.io call detail).
-const justcallCallUrl = (id: string) => `https://app.justcall.io/calls/${encodeURIComponent(id)}`;
+// Rows are text only — no Gmail / JustCall / Granola deep links (Addendum 2).
 
 type Phase = "idle" | "requesting" | "polling" | "timeout" | "unavailable";
 
@@ -93,12 +93,8 @@ function Icon({ channel }: { channel: TimelineItem["channel"] }) {
   }
 }
 
-function Row({ it }: { it: TimelineItem }) {
+function Row({ it, attachments }: { it: TimelineItem; attachments: NoteAttachment[] }) {
   const badge = badgeOf(it);
-  const ref = it.ref ?? {};
-  const gmail = it.channel === "email" && ref.thread_id ? gmailThreadUrl(ref.thread_id) : null;
-  const justcall = it.channel === "call" && ref.call_id ? justcallCallUrl(ref.call_id) : null;
-  const granola = it.channel === "meeting" && ref.meeting_url ? ref.meeting_url : null;
   const byLine = [it.by, it.participants && it.participants.length ? it.participants.join(", ") : null].filter(Boolean).join(" · ");
   return (
     <li className={`atl-row atl-${it.channel}`}>
@@ -109,25 +105,30 @@ function Row({ it }: { it: TimelineItem }) {
           <span className={`atl-badge ${badge.cls}`}>{badge.text}</span>
           {byLine && <span className="atl-by muted">{byLine}</span>}
         </div>
-        <div className="atl-title">
-          {gmail ? (
-            <a href={gmail} target="_blank" rel="noreferrer" title="Open this thread in Gmail">{it.title}</a>
-          ) : it.title}
-        </div>
+        <div className="atl-title">{it.title}</div>
         {it.summary && <p className="atl-summary muted">{it.summary}</p>}
-        {(it.outcome || justcall || granola) && (
+        {it.outcome && (
           <div className="atl-foot">
-            {it.outcome && <span className="chip chip-neutral atl-outcome">{it.outcome}</span>}
-            {justcall && <a className="atl-link" href={justcall} target="_blank" rel="noreferrer">Open in JustCall</a>}
-            {granola && <a className="atl-link" href={granola} target="_blank" rel="noreferrer">Open in Granola</a>}
+            <span className="chip chip-neutral atl-outcome">{it.outcome}</span>
           </div>
         )}
+        {attachments.length > 0 && <AttachmentChips items={attachments} />}
       </div>
     </li>
   );
 }
 
-export default function ActivityTimeline({ contactId, initial }: { contactId: string; initial: ContactSummary | null }) {
+// Manual-note attachments are matched to note rows by timestamp (the
+// generated timeline carries no note id) — ±2 min tolerance.
+function attachmentsFor(it: TimelineItem, notes: ContactNoteLite[]): NoteAttachment[] {
+  if (it.channel !== "note" || notes.length === 0) return [];
+  const t = new Date(it.at).getTime();
+  if (Number.isNaN(t)) return [];
+  const hit = notes.find((n) => Math.abs(new Date(n.created_at).getTime() - t) < 120_000);
+  return hit ? hit.attachments : [];
+}
+
+export default function ActivityTimeline({ contactId, initial, noteAttachments = [] }: { contactId: string; initial: ContactSummary | null; noteAttachments?: ContactNoteLite[] }) {
   const [row, setRow] = useState<ContactSummary | null>(initial);
   const [phase, setPhase] = useState<Phase>("idle");
   const ticks = useRef(0);
@@ -270,7 +271,7 @@ export default function ActivityTimeline({ contactId, initial }: { contactId: st
 
       {hasItems && (
         <ol className="atl-list">
-          {items.map((it, i) => <Row key={`${it.at}-${i}`} it={it} />)}
+          {items.map((it, i) => <Row key={`${it.at}-${i}`} it={it} attachments={attachmentsFor(it, noteAttachments)} />)}
         </ol>
       )}
     </section>

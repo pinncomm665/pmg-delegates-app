@@ -9,7 +9,7 @@ import { confirmLeave } from "../../dirty";
 //   history       Contact History
 //   registration  Participation (status + registration)
 //   background    Background Notes
-//   activity      Activity (change log)
+//   activity      Logs (change log of field edits; aliases: changes, log, logs)
 // Friendly aliases are accepted too (e.g. ?tab=participation → registration).
 type TabKey = "contact" | "history" | "registration" | "background" | "activity";
 
@@ -18,7 +18,7 @@ const TABS: { k: TabKey; label: string }[] = [
   { k: "history", label: "Contact History" },
   { k: "registration", label: "Participation" },
   { k: "background", label: "Background Notes" },
-  { k: "activity", label: "Activity" },
+  { k: "activity", label: "Logs" },
 ];
 const KEYS = TABS.map((t) => t.k);
 const ALIAS: Record<string, TabKey> = {
@@ -30,6 +30,7 @@ const ALIAS: Record<string, TabKey> = {
   notes: "background",
   changes: "activity",
   log: "activity",
+  logs: "activity",
 };
 export function resolveTab(v: string | null | undefined): TabKey {
   const s = (v ?? "").toLowerCase().trim();
