@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import Breadcrumb from "../Breadcrumb";
 import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, type SortKey } from "@/lib/data";
+import { formatPhone } from "@/lib/phone";
 import Shell from "../Shell";
 import DelegateSearch from "./DelegateSearch";
 import DelegatesList from "./DelegatesList";
@@ -205,7 +206,7 @@ export default async function DelegatesPage({
           stageLabel: stageLabel(r.stage),
           stageClass: stageBadgeClass(r.stage),
           email: r.contact?.email ?? null,
-          phone: bestPhone(r.contact),
+          phone: formatPhone(bestPhone(r.contact)),
           linkedin: r.contact?.linkedin_url_canonical ?? null,
         }))}
         filterQs={filterQs}

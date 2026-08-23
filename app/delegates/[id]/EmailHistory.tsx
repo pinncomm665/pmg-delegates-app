@@ -10,7 +10,19 @@ type Msg = {
   snippet: string | null;
   inbox: string | null;
   direction: "inbound" | "outbound";
+  // Gmail thread id (passed through the /api/email-history proxy) → deep link.
+  thread_id?: string | null;
 };
+
+const gmailThreadUrl = (id: string) => `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(id)}`;
+
+// "Name <a@b.com>" → "a@b.com"; bare address passes through.
+function addressOf(v: string | null): string | null {
+  if (!v) return null;
+  const m = v.match(/<([^>]+)>/);
+  const a = (m ? m[1] : v).trim();
+  return a.includes("@") ? a : null;
+}
 
 function fmt(d: string | null) {
   if (!d) return "";
@@ -95,8 +107,28 @@ export default function EmailHistory({ email }: { email: string | null }) {
               <span className="muted" style={{ fontSize: 12 }}>{fmt(m.date)}</span>
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>
-              {m.subject ?? "(no subject)"}
+              {m.thread_id ? (
+                <a
+                  href={gmailThreadUrl(m.thread_id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open this thread in Gmail"
+                >
+                  {m.subject ?? "(no subject)"}
+                </a>
+              ) : (
+                m.subject ?? "(no subject)"
+              )}
             </div>
+            {(() => {
+              const addr = addressOf(inbound ? m.from : m.to);
+              return addr ? (
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  {inbound ? "From " : "To "}
+                  <a href={`mailto:${addr}`} title={`Email ${addr}`}>{addr}</a>
+                </div>
+              ) : null;
+            })()}
             {m.snippet && (
               <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
                 {m.snippet.slice(0, 140)}

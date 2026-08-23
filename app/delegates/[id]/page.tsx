@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser, isAdmin, isReviewer } from "@/lib/session";
-import { getDelegate, getEnrolments, getContactProfile, getContactSummary, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
+import { getDelegate, getContactProfile, getContactSummary, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
 import AISummary from "./AISummary";
 import EmailHistory from "./EmailHistory";
 import ProfileTabs from "./ProfileTabs";
 import { companyDisplay } from "@/lib/company";
 import RegistrationForm from "./RegistrationForm";
-import InstantlyHistory from "./InstantlyHistory";
 import Avatar from "../../Avatar";
 import Shell from "../../Shell";
 import Breadcrumb from "../../Breadcrumb";
@@ -43,8 +42,7 @@ export default async function DelegateDetail({
   const ret = searchParams.return ?? "";
   const backHref = ret ? `/delegates?${ret}` : "/delegates";
   // Independent reads → one round trip.
-  const [enrolments, profile, activity, summary] = await Promise.all([
-    c.id ? getEnrolments(c.id) : Promise.resolve([]),
+  const [profile, activity, summary] = await Promise.all([
     c.id ? getContactProfile(c.id, "delegate", d.event_id) : Promise.resolve(null),
     c.id ? getContactActivity(c.id) : Promise.resolve([]),
     c.id ? getContactSummary(c.id) : Promise.resolve(null),
@@ -152,17 +150,10 @@ export default async function DelegateDetail({
               </ContactDetails>
             }
             history={
-              <div className="grid2">
+              <div className="fieldset-stack">
                 <div>
                   <p className="section-title" style={{ marginBottom: 12 }}>Email history</p>
                   <EmailHistory email={c.email ?? c.personal_email ?? null} />
-                </div>
-                <div>
-                  <p className="section-title" style={{ marginBottom: 12 }}>Instantly history</p>
-                  <InstantlyHistory
-                    email={c.email ?? c.personal_email ?? null}
-                    enrolments={enrolments}
-                  />
                 </div>
               </div>
             }

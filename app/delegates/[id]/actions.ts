@@ -9,7 +9,10 @@ import { getDelegate, getCompanyById, STAGE_VALUES, type DelegateRow } from "@/l
 import { canEdit, stageChangeNeedsReview, emailDomainMatches, SECURED_STAGES, NO_ACCESS_MSG } from "@/lib/policy";
 import { logChange, isRateGuarded, RATE_GUARD_MSG } from "@/lib/changes";
 import { companyDisplay } from "@/lib/company";
-import { canonicalizeLinkedinUrl, fullNameFrom, normalizePhone, type FieldWriteResult } from "@/lib/contactFields";
+import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
+import { normalizePhone } from "@/lib/phone";
+import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
+import { cleanNameFields } from "@/lib/nameClean";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);
@@ -343,7 +346,9 @@ function managedWith(d: DelegateRow, field: string): string[] {
 // Work email — Tier B: MV valid AND domain matches the company → apply + log;
 // otherwise queued with the reason. (Was the "Found a new email?" form.)
 export async function updateWorkEmail(delegateId: string, email: string): Promise<FieldWriteResult> {
-  const newEmail = email.trim().toLowerCase();
+  // Outbound address: normalised (trim, lowercase domain) AND fully lowercased —
+  // finders, MillionVerifier and dedup all key on the lowercase form.
+  const newEmail = normalizeEmail(email).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return { ok: false, message: "Enter a valid email address." };
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;
@@ -465,16 +470,20 @@ export async function undoPromotePersonalEmail(
 // Name — Tier C identity change: QUEUED (kind 'role', field 'name'). Admin /
 // reviewer apply immediately (they could approve it anyway) + log.
 export async function updateName(delegateId: string, first: string, last: string): Promise<FieldWriteResult> {
-  const f = first.trim().replace(/\s+/g, " ");
-  const l = last.trim().replace(/\s+/g, " ");
-  const full = fullNameFrom(f, l);
+  // CRM name engine (lib/nameClean.ts, ported from pmg-agent): honorifics and
+  // credentials stripped, "LASTNAME, First" handled, engine casing. properCaseName
+  // is only the fallback when the engine returns nothing for a box.
+  const cleaned = cleanNameFields(first, last);
+  const f = cleaned.first || properCaseName(first);
+  const l = cleaned.last || (cleaned.first ? "" : properCaseName(last));
+  const full = cleaned.full || fullNameFrom(f, l);
   if (full.length < 2) return { ok: false, message: "Enter the person’s name." };
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;
   const { user, d } = ctx;
   const current = d.contact?.full_name_clean ?? null;
   if (current === full && (d.contact?.first_name_clean ?? "") === f && (d.contact?.last_name_clean ?? "") === l) {
-    return { ok: true, message: "Name unchanged", value: full };
+    return { ok: true, message: "Name unchanged", value: full, first: f, last: l };
   }
   const entry = { ...base(d), kind: "role" as const, field: "name", current_value: current, proposed_value: full };
   if (!isReviewer(user) || (await isRateGuarded(user))) {
@@ -494,12 +503,12 @@ export async function updateName(delegateId: string, first: string, last: string
   if (error) return { ok: false, message: error.message };
   await logChange(user, entry);
   revalidatePath(`/delegates/${delegateId}`);
-  return { ok: true, message: "Name updated", value: full };
+  return { ok: true, message: "Name updated", value: full, first: f, last: l };
 }
 
 // Job title — Tier A: auto-apply + log (kind 'role', field 'job_title').
 export async function updateJobTitle(delegateId: string, title: string): Promise<FieldWriteResult> {
-  const t = title.trim().replace(/\s+/g, " ");
+  const t = titleCaseJobTitle(title);
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;
   const { user, d } = ctx;
@@ -529,8 +538,7 @@ export async function updatePersonalEmail(delegateId: string, value: string, ret
   let v: string | null = null;
   if (raw) {
     if (!PERSONAL_EMAIL_RE.test(raw)) return { ok: false, message: "Enter a valid email address." };
-    const at = raw.lastIndexOf("@");
-    v = raw.slice(0, at) + "@" + raw.slice(at + 1).toLowerCase();
+    v = normalizeEmail(raw);
   }
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;
@@ -568,12 +576,22 @@ export async function updatePhone(
   restoreOther?: { other_phone: string | null }
 ): Promise<FieldWriteResult> {
   if (!PHONE_FIELDS.includes(field)) return { ok: false, message: "Unknown phone field." };
-  const v = normalizePhone(value);
-  if (v && v.replace(/\D/g, "").length < 5) return { ok: false, message: "Enter a valid phone number." };
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;
   const { user, d } = ctx;
   const c = d.contact ?? {};
+  // Always stored as E.164 (+country code). National forms are auto-corrected
+  // using the contact's country → company HQ country → edition country.
+  let v = "";
+  if (value.trim()) {
+    const n = normalizePhone(value, {
+      countryIso: c.country_iso ?? null,
+      companyCountryIso: c.company?.headquarters_country_iso ?? null,
+      editionCountry: d.event_edition ?? null,
+    });
+    if ("error" in n) return { ok: false, message: n.error };
+    v = n.e164;
+  }
   const current: string | null = c[field] ?? null;
   if ((current ?? "") === v) return { ok: true, message: "Number unchanged", value: current, other_phone: c.other_phone ?? null };
   const entry = { ...base(d), kind: "phone" as const, field, current_value: current, proposed_value: v || null };

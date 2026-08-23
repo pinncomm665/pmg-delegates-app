@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin, requireReviewer } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { STAGE_VALUES } from "@/lib/data";
+import { normalizePhone } from "@/lib/phone";
 import { postIntakeReview } from "./intake";
 
 // All queue actions end with a redirect carrying a one-line success flash.
@@ -100,9 +101,23 @@ export async function approveRequest(formData: FormData) {
     await sb.from("contacts").update({ company_name_submitted: req.proposed_company }).eq("id", req.contact_id);
     applied = `Recorded "${req.proposed_company}" — create/link it in the CRM`;
   } else if (req.kind === "phone" && req.proposed_value) {
+    // Stored as E.164 — re-normalise here too (older queue rows may carry a
+    // national form); hints: contact country → company HQ → edition country.
+    const { data: pc } = await sb
+      .from("contacts")
+      .select("country_iso, company:companies(headquarters_country_iso)")
+      .eq("id", req.contact_id)
+      .maybeSingle();
+    const pcAny = pc as { country_iso?: string | null; company?: { headquarters_country_iso?: string | null } | null } | null;
+    const n = normalizePhone(String(req.proposed_value), {
+      countryIso: pcAny?.country_iso ?? null,
+      companyCountryIso: pcAny?.company?.headquarters_country_iso ?? null,
+      editionCountry: (req.event_edition as string | null) ?? null,
+    });
+    if ("error" in n) done("warn", n.error);
     await sb
       .from("contacts")
-      .update({ other_phone: req.proposed_value, other_phone_source: "user_managed" })
+      .update({ other_phone: n.e164, other_phone_source: "user_managed" })
       .eq("id", req.contact_id);
     applied = "Phone added";
   } else if ((req.kind === "registration" || req.kind === "logistics") && req.delegate_id && req.proposed_value) {

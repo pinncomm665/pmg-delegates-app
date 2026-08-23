@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "../../Toast";
 import { emailStatusColors, type EmailStatus } from "@/lib/emailstatus";
-import { linkedinSlug, splitForEdit, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
+import { splitForEdit, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
+import { formatPhone, PHONE_HINT_TEXT } from "@/lib/phone";
 import { DetailRow, InlineEditor, PromoteIcon } from "./FieldEditor";
 import UpdateCompany from "./UpdateCompany";
 import {
@@ -47,6 +48,21 @@ function statusFromMv(v: string | null): EmailStatus {
   if (["ok", "valid"].includes(x)) return "Valid";
   if (["invalid", "disposable"].includes(x)) return "Invalid";
   return "Unknown";
+}
+
+
+// Inline LinkedIn "in" glyph — the read-only row shows ONLY this icon (accent
+// colour, opens the profile in a new tab); the full URL appears in edit mode.
+function LinkedInIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false" style={{ verticalAlign: "-4px" }}>
+      <rect width="24" height="24" rx="4" fill="var(--accent)" />
+      <path
+        fill="#fff"
+        d="M6.94 8.7H4.34V19h2.6V8.7ZM5.64 7.58a1.51 1.51 0 1 0 0-3.02 1.51 1.51 0 0 0 0 3.02ZM12 13.27c0-1.18.54-1.88 1.58-1.88.96 0 1.42.68 1.42 1.88V19h2.59v-6.64c0-2.25-1.28-3.34-3.06-3.34-1.43 0-2.06.8-2.42 1.36h-.11V8.7H9.41V19H12v-5.73Z"
+      />
+    </svg>
+  );
 }
 
 function Empty() {
@@ -133,7 +149,7 @@ export default function ContactDetails({
     const prevLast = c.last_name_clean ?? splitForEdit(c.full_name_clean).last;
     const r = await updateName(delegateId, first, last);
     settle("name", r,
-      () => setC((x) => ({ ...x, full_name_clean: r.value ?? fullNameFrom(first, last), first_name_clean: first.trim(), last_name_clean: last.trim() })),
+      () => setC((x) => ({ ...x, full_name_clean: r.value ?? fullNameFrom(first, last), first_name_clean: r.first ?? first.trim(), last_name_clean: r.last ?? last.trim() })),
       isReviewer ? async () => {
         const u = await updateName(delegateId, prevFirst, prevLast);
         if (u.ok && !u.queued) setC((x) => ({ ...x, full_name_clean: u.value ?? null, first_name_clean: prevFirst, last_name_clean: prevLast }));
@@ -362,36 +378,36 @@ export default function ContactDetails({
         />
         <DetailRow
           label="Phone"
-          value={<>{c.office_phone || <Empty />}<QueuedChip k="office_phone" /></>}
+          value={<>{formatPhone(c.office_phone) || <Empty />}<QueuedChip k="office_phone" /></>}
           editing={editing === "office_phone"}
           onEdit={() => open("office_phone")}
           disabled={busy}
           editor={
-            <InlineEditor onSave={savePhone("office_phone")} onCancel={close} saving={saving} error={error} help="The previous number is kept (moved to Other phone when that’s empty).">
+            <InlineEditor onSave={savePhone("office_phone")} onCancel={close} saving={saving} error={error} help={`${PHONE_HINT_TEXT} The previous number is kept (moved to Other phone when that’s empty).`}>
               {textInput({ id: "cd-phone", label: "Phone", type: "tel", inputMode: "tel", placeholder: "+…" })}
             </InlineEditor>
           }
         />
         <DetailRow
           label="Mobile"
-          value={<>{c.mobile || <Empty />}<QueuedChip k="mobile" /></>}
+          value={<>{formatPhone(c.mobile) || <Empty />}<QueuedChip k="mobile" /></>}
           editing={editing === "mobile"}
           onEdit={() => open("mobile")}
           disabled={busy}
           editor={
-            <InlineEditor onSave={savePhone("mobile")} onCancel={close} saving={saving} error={error} help="The previous number is kept (moved to Other phone when that’s empty).">
+            <InlineEditor onSave={savePhone("mobile")} onCancel={close} saving={saving} error={error} help={`${PHONE_HINT_TEXT} The previous number is kept (moved to Other phone when that’s empty).`}>
               {textInput({ id: "cd-mobile", label: "Mobile", type: "tel", inputMode: "tel", placeholder: "+…" })}
             </InlineEditor>
           }
         />
         <DetailRow
           label="Other phone"
-          value={<>{c.other_phone || <Empty />}<QueuedChip k="other_phone" /></>}
+          value={<>{formatPhone(c.other_phone) || <Empty />}<QueuedChip k="other_phone" /></>}
           editing={editing === "other_phone"}
           onEdit={() => open("other_phone")}
           disabled={busy}
           editor={
-            <InlineEditor onSave={savePhone("other_phone")} onCancel={close} saving={saving} error={error} help="Applies immediately and is logged.">
+            <InlineEditor onSave={savePhone("other_phone")} onCancel={close} saving={saving} error={error} help={`${PHONE_HINT_TEXT} Applies immediately and is logged.`}>
               {textInput({ id: "cd-other", label: "Other phone", type: "tel", inputMode: "tel", placeholder: "+…" })}
             </InlineEditor>
           }
@@ -401,8 +417,15 @@ export default function ContactDetails({
           value={
             <>
               {c.linkedin_url_canonical ? (
-                <a href={c.linkedin_url_canonical} target="_blank" rel="noreferrer" title={c.linkedin_url_canonical}>
-                  {linkedinSlug(c.linkedin_url_canonical)}
+                <a
+                  href={c.linkedin_url_canonical}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open LinkedIn profile"
+                  title="Open LinkedIn profile"
+                  style={{ display: "inline-flex", lineHeight: 0 }}
+                >
+                  <LinkedInIcon />
                 </a>
               ) : <Empty />}
               <QueuedChip k="linkedin" />
@@ -413,10 +436,10 @@ export default function ContactDetails({
           disabled={busy}
           editor={
             <InlineEditor onSave={saveLinkedin} onCancel={close} saving={saving} error={error}
-              canSave={/linkedin\.com\/in\//i.test(draft)}
-              help="Saved as https://www.linkedin.com/in/<slug>. If another contact already carries this profile it’s sent for review instead."
+              canSave={draft.trim().length >= 3}
+              help="Paste the profile URL or just the slug — saved as https://www.linkedin.com/in/<slug>. If another contact already carries this profile it’s sent for review instead."
             >
-              {textInput({ id: "cd-linkedin", label: "LinkedIn profile URL", type: "url", inputMode: "url", placeholder: "https://www.linkedin.com/in/…" })}
+              {textInput({ id: "cd-linkedin", label: "LinkedIn profile URL", type: "url", inputMode: "url", placeholder: "https://www.linkedin.com/in/… or just the slug" })}
             </InlineEditor>
           }
         />
