@@ -75,6 +75,8 @@ export default function ActivityReport({
   page,
   pageCount,
   pageSize,
+  viewerEmail = "",
+  viewerElevated = false,
 }: {
   rows: ActivityFeedRow[];
   total: number;
@@ -87,6 +89,9 @@ export default function ActivityReport({
   page: number;
   pageCount: number;
   pageSize: number;
+  // Who may Retry a failed voice transcript (admin / reviewer → any; else author).
+  viewerEmail?: string;
+  viewerElevated?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -149,6 +154,22 @@ export default function ActivityReport({
     if (r.contact_name) return <Link href={ACTIVITY_LIST_FALLBACK(r.contact_name)} title="Search the list for this contact">{name}</Link>;
     return <span className="muted">{name}</span>;
   };
+  // Voice-transcript pill under the chips. The feed view already folds a ready
+  // transcript into `summary`, so only the pending / unavailable states show.
+  const attachmentsCell = (r: ActivityFeedRow) =>
+    r.attachments.length > 0 ? (
+      <AttachmentChips
+        items={r.attachments}
+        compact
+        transcript={r.note_id && r.transcript_status ? {
+          noteId: r.note_id,
+          status: r.transcript_status,
+          text: r.transcript,
+          showText: false,
+          canRetry: viewerElevated || (!!viewerEmail && !!r.note_author && r.note_author.toLowerCase() === viewerEmail.toLowerCase()),
+        } : null}
+      />
+    ) : null;
   const typeChip = (t: string) => <span className={`chip ar-type ${TYPE_CLASS[t] ?? "ar-t-other"}`}>{t}</span>;
   const summaryCell = (r: ActivityFeedRow, clamp: boolean) => {
     const text = r.summary ?? r.title ?? "";
@@ -372,7 +393,7 @@ export default function ActivityReport({
                     <td className="muted ar-company">{r.company_name ?? "—"}</td>
                     <td>{typeChip(r.activity)}</td>
                     <td className="muted ar-owner-cell" title={r.owner_email ?? undefined}>{firstName(r)}</td>
-                    <td className="ar-summary-cell">{summaryCell(r, true)}{r.attachments.length > 0 && <AttachmentChips items={r.attachments} compact />}</td>
+                    <td className="ar-summary-cell">{summaryCell(r, true)}{attachmentsCell(r)}</td>
                   </tr>
                 ))}
                 {rows.length === 0 && (
@@ -397,7 +418,7 @@ export default function ActivityReport({
                   <span className="sp-name">{contactCell(r)}</span>
                   {r.company_name && <span className="sp-sub"> · {r.company_name}</span>}
                 </div>
-                <div className="ar-card-sum">{summaryCell(r, true)}{r.attachments.length > 0 && <AttachmentChips items={r.attachments} compact />}</div>
+                <div className="ar-card-sum">{summaryCell(r, true)}{attachmentsCell(r)}</div>
               </div>
             ))}
             {rows.length === 0 && (

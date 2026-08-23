@@ -157,7 +157,7 @@ export default async function DelegateDetail({
             }
             history={
               c.id ? (
-                <ActivityTimeline contactId={c.id} initial={summary} noteAttachments={noteAttachments} />
+                <ActivityTimeline contactId={c.id} initial={summary} noteAttachments={noteAttachments} viewerEmail={user.email} viewerElevated={isReviewer(user)} />
               ) : (
                 <p className="muted" style={{ fontSize: 13 }}>No activity recorded yet.</p>
               )

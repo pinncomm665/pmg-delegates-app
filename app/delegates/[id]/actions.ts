@@ -13,7 +13,7 @@ import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/
 import { normalizePhone } from "@/lib/phone";
 import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
 import { cleanNameFields } from "@/lib/nameClean";
-import { insertContactNote, isNoteChannel, fmtDuration, type NoteAttachment, type NoteChannel } from "@/lib/notes";
+import { insertContactNote, isNoteChannel, fmtDuration, hasVoiceAttachment, requestTranscription, type NoteAttachment, type NoteChannel } from "@/lib/notes";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);
@@ -711,6 +711,13 @@ export async function logActivity(input: LogActivityInput): Promise<{ ok: true; 
 
   const res = await insertContactNote({ contactId, channel, text, at, authorEmail: user.email, attachments });
   if (!res.ok) return { ok: false, error: res.error };
+
+  // Voice note → ask pmg-agent to transcribe it. Marks the row pending (column
+  // may not exist yet — ignored) and fires the request without blocking the
+  // save; every failure is swallowed.
+  if (res.id && hasVoiceAttachment(attachments)) {
+    try { await requestTranscription(res.id); } catch {}
+  }
 
   // Change log (Tier A). kind 'note' needs the widened CHECK (mig 217); fall
   // back to 'other' + field 'note' on older schemas so the log row still lands.
