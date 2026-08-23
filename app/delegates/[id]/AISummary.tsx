@@ -179,12 +179,20 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
   const paras = paragraphs(row?.summary_md ?? null);
   const facts = row?.facts ?? {};
   const cautions = Array.isArray(facts.cautions) ? facts.cautions.filter(Boolean).slice(0, 3) : [];
-  const lastBits = [
-    fmtDate(facts.last_contact_at),
-    facts.last_contact_direction ?? null,
-    facts.last_contact_by ?? null,
-    facts.last_subject ?? null,
-  ].filter(Boolean) as string[];
+  // Split view: last thing WE sent vs last thing THEY sent. Older rows (facts v1)
+  // only carry last_contact_*; fall back to that so nothing renders blank.
+  const hasSplit = "last_outbound_at" in facts || "last_inbound_at" in facts;
+  const wroteBits = hasSplit
+    ? ([fmtDate(facts.last_outbound_at), facts.last_outbound_by ?? null, facts.last_outbound_subject ?? null].filter(Boolean) as string[])
+    : facts.last_contact_direction === "outbound"
+      ? ([fmtDate(facts.last_contact_at), facts.last_contact_by ?? null, facts.last_subject ?? null].filter(Boolean) as string[])
+      : [];
+  const repliedBits = hasSplit
+    ? ([fmtDate(facts.last_inbound_at), facts.last_inbound_subject ?? null].filter(Boolean) as string[])
+    : facts.last_contact_direction === "inbound"
+      ? ([fmtDate(facts.last_contact_at), facts.last_subject ?? null].filter(Boolean) as string[])
+      : [];
+  const lastBits = [...wroteBits, ...repliedBits];
   const busy = phase === "requesting" || (phase === "polling" && inflight);
   const showBody = row?.status === "ready" && paras.length > 0;
   const updated = relTime(row?.generated_at ?? row?.updated_at);
@@ -250,9 +258,14 @@ export default function AISummary({ contactId, initial }: { contactId: string; i
 
         {(lastBits.length > 0 || facts.next_step || cautions.length > 0) && !busy && (
           <div className="ai-sum-facts">
-            {lastBits.length > 0 && (
+            {wroteBits.length > 0 && (
               <span className="chip chip-neutral">
-                <span className="ai-sum-k">Last contact</span> {lastBits.join(" · ")}
+                <span className="ai-sum-k">Last we wrote</span> {wroteBits.join(" · ")}
+              </span>
+            )}
+            {(repliedBits.length > 0 || wroteBits.length > 0) && (
+              <span className={`chip ${repliedBits.length > 0 ? "chip-ok" : "chip-neutral"}`}>
+                <span className="ai-sum-k">Last they replied</span> {repliedBits.length > 0 ? repliedBits.join(" · ") : "no reply yet"}
               </span>
             )}
             {facts.next_step && (
