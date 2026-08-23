@@ -9,6 +9,7 @@ import {
   periodSince,
   DEFAULT_PERIOD,
   SUMMARY_PERIODS,
+  SCOPE_NOUN,
   type SummaryPeriod,
 } from "@/lib/data";
 import Shell from "../Shell";
@@ -19,9 +20,11 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
+const SCOPE_NOTE = `Only activity on ${SCOPE_NOUN} is shown.`;
 
-// Activity Report — one consolidated, chronological log of ALL team activity
-// across ALL contacts (the accountability view). Data = pmg-agent view
+// Activity Report — one consolidated, chronological log of team activity on
+// the contacts that hold a role in THIS app (the accountability view, scoped
+// per app — see lib/activityFeed.ts SCOPE). Data = pmg-agent view
 // `team_activity_feed`; filters live in the URL so the page is shareable and
 // the back button restores it. Server-paginated, 50 per page.
 export default async function ActivityPage({
@@ -68,7 +71,10 @@ export default async function ActivityPage({
   return (
     <Shell user={user}>
       <div className="page-head">
-        <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Activity Report" }]} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Activity Report" }]} />
+          <p className="muted" style={{ fontSize: 13, margin: "2px 0 0" }}>{SCOPE_NOTE}</p>
+        </div>
         <span className="muted page-head-aside" style={{ fontSize: 13, whiteSpace: "nowrap" }}>
           {feed.available ? (
             <>
@@ -93,6 +99,7 @@ export default async function ActivityPage({
         pageSize={PAGE_SIZE}
         viewerEmail={user.email}
         viewerElevated={isReviewer(user)}
+        scopeNote={SCOPE_NOTE}
       />
     </Shell>
   );

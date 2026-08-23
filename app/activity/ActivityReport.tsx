@@ -79,6 +79,7 @@ export default function ActivityReport({
   pageSize,
   viewerEmail = "",
   viewerElevated = false,
+  scopeNote = null,
 }: {
   rows: ActivityFeedRow[];
   total: number;
@@ -94,6 +95,8 @@ export default function ActivityReport({
   // Who may Retry a failed voice transcript (admin / reviewer → any; else author).
   viewerEmail?: string;
   viewerElevated?: boolean;
+  // "Only activity on <speakers|delegates|roundtable attendees> is shown."
+  scopeNote?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -173,20 +176,32 @@ export default function ActivityReport({
       />
     ) : null;
   const typeChip = (t: string) => <span className={`chip ar-type ${TYPE_CLASS[t] ?? "ar-t-other"}`}>{t}</span>;
+  // "What happened" — the view's one-sentence `one_liner` when present, else
+  // the legacy title/summary. Single line with ellipsis; full text on hover
+  // (title) and on click (expand). Expanding a one-liner row also reveals the
+  // longer title/summary underneath when it adds anything.
   const summaryCell = (r: ActivityFeedRow, clamp: boolean) => {
-    const text = r.summary ?? r.title ?? "";
+    const legacy = r.summary ?? r.title ?? "";
+    const text = r.one_liner ?? legacy;
     if (!text) return <span className="muted">—</span>;
     const open = expanded.has(r.id);
+    const hover = r.one_liner && legacy && legacy !== r.one_liner ? `${r.one_liner}\n\n${legacy}` : text;
     return (
       <button
         type="button"
         className={`ar-sum${clamp && !open ? " is-clamped" : ""}`}
-        title={clamp && !open ? text : undefined}
+        title={clamp && !open ? hover : undefined}
         onClick={() => toggleExpand(r.id)}
         aria-expanded={open}
       >
-        {r.title && r.summary && r.title !== r.summary ? <strong>{r.title} · </strong> : null}
+        {!r.one_liner && r.title && r.summary && r.title !== r.summary ? <strong>{r.title} · </strong> : null}
         {text}
+        {open && r.one_liner && legacy && legacy !== r.one_liner ? (
+          <span className="muted" style={{ display: "block", marginTop: 4 }}>
+            {r.title && r.summary && r.title !== r.summary ? <strong>{r.title} · </strong> : null}
+            {legacy}
+          </span>
+        ) : null}
       </button>
     );
   };
@@ -216,7 +231,10 @@ export default function ActivityReport({
         <div className="section-head">
           <div>
             <p id="ar-sum-title" className="section-title">Activity summary</p>
-            <p className="section-sub">Touches per account owner · tracked team · {periodLabel}. Click a cell to filter the feed below.</p>
+            <p className="section-sub">
+              Touches per account owner · tracked team · {periodLabel}. Click a cell to filter the feed below.
+              {scopeNote ? <> {scopeNote}</> : null}
+            </p>
           </div>
           <div className="ar-periods" role="group" aria-label="Summary period">
             {SUMMARY_PERIODS.map((p) => (
@@ -385,7 +403,7 @@ export default function ActivityReport({
                   <th>Company</th>
                   <th>Activity</th>
                   <th>Owner</th>
-                  <th>Summary</th>
+                  <th>What happened</th>
                 </tr>
               </thead>
               <tbody>
@@ -433,7 +451,7 @@ export default function ActivityReport({
 
           {(pageCount > 1 || total > pageSize) && <Pager />}
           <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-            {total.toLocaleString()} total · {pageSize} per page · click a summary to expand it
+            {total.toLocaleString()} total · {pageSize} per page · click a row’s “what happened” to expand it{scopeNote ? <> · {scopeNote}</> : null}
           </p>
         </>
       )}
