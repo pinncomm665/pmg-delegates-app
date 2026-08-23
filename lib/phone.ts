@@ -9,7 +9,9 @@
 //
 // Identical copy in speakers-app / delegates-app / roundtables-app (lib/phone.ts).
 
-import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+// NOTE: "/max" metadata is required — the default bundle returns undefined from
+// getType(), which would silently reject every edition-only mobile.
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js/max";
 
 export type PhoneHints = {
   countryIso?: string | null;
@@ -89,14 +91,29 @@ export function normalizePhone(raw: string, hints: PhoneHints = {}): PhoneResult
     return { error: PHONE_ERROR };
   }
 
-  // 2. National form → try default countries in hint order.
+  // 2. National form → try default countries in hint order. Only fully VALID
+  //    matches count — isPossible() alone is NOT enough (a UK "0115…" landline
+  //    was filed as +966… that way). When the ONLY hint is the event/edition
+  //    country (no contact country, no company country), the number must also
+  //    be a mobile (MOBILE / FIXED_LINE_OR_MOBILE): edition-only FIXED_LINE
+  //    matches were exactly the Philippine/Indian numbers mis-filed as Indonesian.
+  const contactIso = cleanIso(hints.countryIso);
+  const companyIso = cleanIso(hints.companyCountryIso);
+  const editionIso = countryIsoFromEdition(hints.editionCountry);
+  const editionOnly = !contactIso && !companyIso && !!editionIso;
   const order: CountryCode[] = [];
-  for (const c of [cleanIso(hints.countryIso), cleanIso(hints.companyCountryIso), countryIsoFromEdition(hints.editionCountry)]) {
+  for (const c of [contactIso, companyIso, editionIso]) {
     if (c && !order.includes(c)) order.push(c);
   }
-  const candidates = order.map((c) => parsePhoneNumberFromString(s, c)).filter(Boolean);
-  const valid = candidates.find((n) => n!.isValid());
-  if (valid) return finish(valid)!;
+  for (const c of order) {
+    const n = parsePhoneNumberFromString(s, c);
+    if (!n || !n.isValid()) continue;
+    if (editionOnly) {
+      const t = n.getType();
+      if (t !== "MOBILE" && t !== "FIXED_LINE_OR_MOBILE") continue;
+    }
+    return finish(n)!;
+  }
 
   // 3. Last-resort guess: typed without "+" but already carrying a country code
   //    ("60193107646", "971567773742" on an SA contact, "353868385969" with no
@@ -108,10 +125,7 @@ export function normalizePhone(raw: string, hints: PhoneHints = {}): PhoneResult
     if (intl && intl.isValid()) return finish(intl)!;
   }
 
-  // 4. Last resort: a hint country that makes it at least *possible*.
-  const possible = candidates.find((n) => n!.isPossible());
-  if (possible) return finish(possible)!;
-
+  // No isPossible()-only fallback: a wrong-country guess is worse than a reject.
   return { error: PHONE_ERROR };
 }
 
