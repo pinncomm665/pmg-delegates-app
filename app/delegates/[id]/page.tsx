@@ -116,6 +116,7 @@ export default async function DelegateDetail({
                   company_name: companyName,
                   email: c.email ?? null,
                   email_status: c.email ? emailStatusOf(c) : null,
+                  email_source: c.email_source ?? null,
                   personal_email: c.personal_email ?? null,
                   office_phone: c.office_phone ?? null,
                   mobile: c.mobile ?? c.phone ?? null,

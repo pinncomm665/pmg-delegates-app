@@ -383,6 +383,85 @@ export async function updateWorkEmail(delegateId: string, email: string): Promis
   return { ok: true, message: "Work email verified and updated", value: newEmail };
 }
 
+// "Use as primary" — Tier B: copy personal_email into the OUTBOUND address
+// (contacts.email) after MillionVerifier says ok. Shown only when the work
+// email is empty or dead. MV not ok → queued for review exactly like
+// updateWorkEmail's invalid branch. personal_email itself is never touched.
+// Domain match is NOT required here (it's a personal inbox by definition);
+// email_source = 'personal_promoted' so finders may later replace it.
+export async function promotePersonalEmail(delegateId: string, returnTo?: string): Promise<FieldWriteResult> {
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const contactId = d.contact?.id as string;
+  const raw: string | null = d.contact?.personal_email ?? null;
+  if (!raw || !PERSONAL_EMAIL_RE.test(raw.trim())) return { ok: false, message: "No personal email on this contact." };
+  const at = raw.trim().lastIndexOf("@");
+  const newEmail = raw.trim().slice(0, at) + "@" + raw.trim().slice(at + 1).toLowerCase();
+  const oldEmail: string | null = d.contact?.email ?? null;
+  if (oldEmail && oldEmail.toLowerCase() === newEmail.toLowerCase()) {
+    return { ok: true, message: "Already the primary email", value: oldEmail };
+  }
+  const previous = {
+    email: oldEmail,
+    email_source: (d.contact?.email_source as string | null) ?? null,
+    email_mv_result: (d.contact?.email_mv_result as string | null) ?? null,
+  };
+
+  const mv = await verifyEmail(newEmail);
+  const entry = { ...base(d), kind: "email" as const, field: "email", current_value: oldEmail, proposed_value: newEmail, mv_result: mv.result };
+  if (!mv.valid) {
+    const err = await logChange(user, entry, "pending");
+    if (err) return { ok: false, message: `Couldn’t queue the change: ${err}` };
+    return { ok: true, queued: true, message: `Email verified as ${mv.result}. Sent for review.` };
+  }
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({
+      email: newEmail,
+      email_source: "personal_promoted",
+      email_mv_result: mv.result,
+      email_mv_verified_at: new Date().toISOString(),
+      user_managed_fields: managedWith(d, "email"),
+    })
+    .eq("id", contactId);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  if (returnTo && returnTo.startsWith("/")) revalidatePath(returnTo);
+  return { ok: true, message: "Now the primary email", value: newEmail, previous };
+}
+
+// Undo for promotePersonalEmail: put the outbound address back exactly as it
+// was (previous null → clear email + email_source). Logged as a plain email
+// change; no MV call (we restore the previous verdict we captured).
+export async function undoPromotePersonalEmail(
+  delegateId: string,
+  previous: { email: string | null; email_source: string | null; email_mv_result: string | null }
+): Promise<FieldWriteResult> {
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const current: string | null = d.contact?.email ?? null;
+  const entry = { ...base(d), kind: "email" as const, field: "email", current_value: current, proposed_value: previous.email };
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({
+      email: previous.email,
+      email_source: previous.email ? previous.email_source : null,
+      email_mv_result: previous.email ? previous.email_mv_result : null,
+    })
+    .eq("id", d.contact?.id);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  return { ok: true, message: "Primary email restored", value: previous.email };
+}
+
 // Name — Tier C identity change: QUEUED (kind 'role', field 'name'). Admin /
 // reviewer apply immediately (they could approve it anyway) + log.
 export async function updateName(delegateId: string, first: string, last: string): Promise<FieldWriteResult> {

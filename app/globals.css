@@ -576,7 +576,7 @@ select.input { padding-right: 32px; }
 .cd-label { font-size: var(--fs-sm); color: var(--muted); margin: 0; }
 .cd-value { font-size: var(--fs-base); margin: 0; min-width: 0; overflow-wrap: anywhere; display: flex; align-items: center; gap: var(--gap-1); flex-wrap: wrap; }
 .cd-value .muted { color: var(--muted); }
-.cd-action { display: flex; justify-content: flex-end; align-items: center; }
+.cd-action { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
 .cd-edit { color: var(--info); }
 .cd-edit .btn-label { display: inline; }
 .cd-lock { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; color: var(--muted); }
