@@ -124,7 +124,11 @@ code { overflow-wrap: anywhere; }
   .crumbs li + li::before { margin: 0 5px; }
   /* last crumb bold; it may take most of the line but never ALL of it, so the
      leading crumbs keep at least their ellipsis */
-  .crumbs li:last-child { font-weight: 600; flex-shrink: 0.25; max-width: 70%; }
+  /* Mobile: show only the last TWO crumbs ("… › Parent › Current"); parent never ellipsises, current does */
+  .crumbs li:not(:nth-last-child(-n+2)) { display: none; }
+  .crumbs li:nth-last-child(2):not(:first-child)::before { content: "… ›"; margin: 0 5px 0 0; }
+  .crumbs li:nth-last-child(2) { flex: 0 0 auto; max-width: 48%; }
+  .crumbs li:last-child { font-weight: 600; flex: 1 1 auto; min-width: 0; }
   .page-head { flex-wrap: wrap; }
   .page-head > .crumbs { flex: 1 1 auto; min-width: min(100%, 240px); }
 }
