@@ -35,7 +35,11 @@ function fmt(d: string | null) {
   });
 }
 
-export default function EmailHistory({ email }: { email: string | null }) {
+// Searches EVERY address on file (work + personal) — the proxy fans out per
+// address and merges. Pass both; nulls are dropped here.
+export default function EmailHistory({ emails }: { emails: Array<string | null | undefined> }) {
+  const list = Array.from(new Set(emails.map((e) => (e ?? "").trim().toLowerCase()).filter((e) => e.includes("@"))));
+  const key = list.join(",");
   const [state, setState] = useState<
     | { kind: "loading" }
     | { kind: "error"; reason: string }
@@ -43,12 +47,12 @@ export default function EmailHistory({ email }: { email: string | null }) {
   >({ kind: "loading" });
 
   useEffect(() => {
-    if (!email) {
+    if (!key) {
       setState({ kind: "ok", messages: [] });
       return;
     }
     let alive = true;
-    fetch(`/api/email-history?email=${encodeURIComponent(email)}`)
+    fetch(`/api/email-history?emails=${encodeURIComponent(key)}`)
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
@@ -59,9 +63,9 @@ export default function EmailHistory({ email }: { email: string | null }) {
     return () => {
       alive = false;
     };
-  }, [email]);
+  }, [key]);
 
-  if (!email)
+  if (!key)
     return <p className="muted" style={{ fontSize: 13 }}>No email on file.</p>;
 
   if (state.kind === "loading")
@@ -78,7 +82,7 @@ export default function EmailHistory({ email }: { email: string | null }) {
   }
 
   if (state.messages.length === 0)
-    return <p className="muted" style={{ fontSize: 13 }}>No emails found with this address.</p>;
+    return <p className="muted" style={{ fontSize: 13 }}>No emails found for this contact’s addresses.</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

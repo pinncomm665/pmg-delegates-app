@@ -153,7 +153,7 @@ export default async function DelegateDetail({
               <div className="fieldset-stack">
                 <div>
                   <p className="section-title" style={{ marginBottom: 12 }}>Email history</p>
-                  <EmailHistory email={c.email ?? c.personal_email ?? null} />
+                  <EmailHistory emails={[c.email, c.personal_email]} />
                 </div>
               </div>
             }
