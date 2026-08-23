@@ -3,6 +3,7 @@ import {
   getActivityFeed,
   getActivityOwners,
   getActivitySummary,
+  ALL_OWNERS_PARAM,
   defaultSince,
   isActivityType,
   periodSince,
@@ -45,7 +46,10 @@ export default async function ActivityPage({
       ? searchParams.activity.split(",")
       : [];
   const activity = rawTypes.map((s) => s.trim()).filter(isActivityType);
-  const owner = (searchParams.owner ?? "").trim().toLowerCase();
+  // Owner: "" = all tracked owners (default); a tracked owner's email; or
+  // "all" = every row incl. system/untracked — admin/reviewer escape hatch.
+  let owner = (searchParams.owner ?? "").trim().toLowerCase();
+  if (owner === ALL_OWNERS_PARAM && !isReviewer(user)) owner = "";
   const since = DAY.test(searchParams.since ?? "") ? (searchParams.since as string) : defaultSince(30);
   const until = DAY.test(searchParams.until ?? "") ? (searchParams.until as string) : "";
   const sort: "asc" | "desc" = searchParams.sort === "asc" ? "asc" : "desc";
