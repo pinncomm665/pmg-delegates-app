@@ -10,6 +10,7 @@ import UpdateCompany from "./UpdateCompany";
 import {
   updateName,
   updateJobTitle,
+  updatePersonalEmail,
   updateWorkEmail,
   updatePhone,
   updateLinkedin,
@@ -32,9 +33,8 @@ export type ContactDetailsData = {
   linkedin_url_canonical: string | null;
 };
 
-type RowKey = "name" | "job_title" | "company" | "email" | "office_phone" | "mobile" | "other_phone" | "linkedin";
+type RowKey = "name" | "job_title" | "company" | "email" | "personal_email" | "office_phone" | "mobile" | "other_phone" | "linkedin";
 
-const PERSONAL_EMAIL_TIP = "Personal email is for warm contact only — managed by the CRM, never edited here.";
 
 function Empty() {
   return <span className="muted">—</span>;
@@ -79,6 +79,7 @@ export default function ContactDetails({
       setFirst(pre.first); setLast(pre.last);
     } else if (k === "job_title") setDraft(c.job_title ?? "");
     else if (k === "email") setDraft(c.email ?? "");
+    else if (k === "personal_email") setDraft(c.personal_email ?? "");
     else if (k === "office_phone") setDraft(c.office_phone ?? "");
     else if (k === "mobile") setDraft(c.mobile ?? "");
     else if (k === "other_phone") setDraft(c.other_phone ?? "");
@@ -142,6 +143,18 @@ export default function ContactDetails({
   const saveEmail = () => run(async () => {
     const r = await updateWorkEmail(delegateId, draft);
     settle("email", r, () => setC((x) => ({ ...x, email: r.value ?? null, email_status: "Valid" })));
+  });
+
+  const savePersonalEmail = () => run(async () => {
+    const prev = c.personal_email;
+    const r = await updatePersonalEmail(delegateId, draft);
+    settle("personal_email", r,
+      () => setC((x) => ({ ...x, personal_email: r.value ?? null })),
+      async () => {
+        const u = await updatePersonalEmail(delegateId, prev ?? "");
+        if (u.ok && !u.queued) setC((x) => ({ ...x, personal_email: u.value ?? null }));
+      }
+    );
   });
 
   const savePhone = (field: PhoneField) => () => run(async () => {
@@ -279,9 +292,18 @@ export default function ContactDetails({
         />
         <DetailRow
           label="Personal email"
-          value={c.personal_email || <Empty />}
-          locked
-          lockTip={PERSONAL_EMAIL_TIP}
+          value={<>{c.personal_email || <Empty />}<QueuedChip k="personal_email" /></>}
+          editing={editing === "personal_email"}
+          onEdit={() => open("personal_email")}
+          disabled={busy}
+          editor={
+            <InlineEditor onSave={savePersonalEmail} onCancel={close} saving={saving} error={error}
+              canSave={draft.trim() === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.trim())}
+              help="Warm contact only — never used for campaigns."
+            >
+              {textInput({ id: "cd-personal-email", label: "Personal email", type: "email", inputMode: "email", placeholder: "name@example.com" })}
+            </InlineEditor>
+          }
         />
         <DetailRow
           label="Phone"
