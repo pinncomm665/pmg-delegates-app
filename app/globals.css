@@ -288,6 +288,15 @@ code { overflow-wrap: anywhere; }
 
 /* ── Pulse dashboard: mobile card fallback ──────────────────────────────────── */
 .dash-cards { display: none; }
+/* Tablet (761–900px): the wide table is cramped — keep the date and "N days
+   left" on one line each and let the Summit name wrap instead */
+.dash-table td:nth-child(2), .dash-table td:nth-child(2) > div, .dash-table td:nth-child(3) { white-space: nowrap; }
+.dash-table td:first-child .dash-row-btn { white-space: normal; }
+/* Cards up to the mobile-shell breakpoint (matches .m-topbar / .m-tabbar) */
+@media (max-width: 760px) {
+  .dash-table { display: none; }
+  .dash-cards { display: flex; flex-direction: column; gap: 10px; }
+}
 .dash-row-btn {
   appearance: none; background: none; border: none; padding: 0; margin: 0; font: inherit;
   color: inherit; cursor: pointer; text-align: left; font-weight: 500; border-radius: 4px;
@@ -298,19 +307,60 @@ code { overflow-wrap: anywhere; }
   padding: 12px 14px; display: block;
 }
 
+/* ── List page filter form (FiltersSheet.tsx): ONE DOM, two layouts ───────── */
+/* Desktop: row 1 = .flt-sheet-panel > .flt-main (selects · More · Apply · Reset),
+   row 2 = .flt-bar (search · exports). The sheet chrome + Filters button hide. */
+.flt-sheet { order: 1; }
+.flt-bar { order: 2; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.flt-search { flex: 1; min-width: 220px; }
+.flt-main { display: flex; gap: 8px; align-items: center; }
+.flt-more { position: relative; }
+.flt-more-btn { white-space: nowrap; }
+.flt-more-pop {
+  display: none; position: absolute; z-index: 10; top: calc(100% + 6px); right: 0; padding: 12px; min-width: 190px;
+  flex-direction: column; gap: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+.flt-more.is-open .flt-more-pop { display: flex; }
+.flt-toggle, .flt-sheet-head, .flt-sheet-foot { display: none; }
+/* Phone shell: compact sticky [search][Filters (n)] row under the breadcrumb;
+   everything else moves into a bottom sheet (same dialog pattern as .m-sheet). */
+@media (max-width: 760px) {
+  /* z-index sits above the tab bar (40) — the sheet is a descendant of this
+     sticky stacking context — and below the page modals (50) */
+  .flt {
+    position: sticky; top: var(--topbar-h); z-index: 45; background: var(--bg);
+    border: none; border-radius: 0; padding: 6px 14px 8px; margin-left: -14px; margin-right: -14px;
+  }
+  .flt-bar { order: 1; flex-wrap: nowrap; gap: 8px; }
+  .flt-search { min-width: 0; }
+  .flt-toggle { display: inline-block; flex-shrink: 0; white-space: nowrap; }
+  .flt-exports-desktop { display: none; }
+
+  .flt-sheet { display: none; position: fixed; inset: 0; z-index: 60; }
+  .flt-sheet.is-open { display: block; }
+  .flt-sheet-backdrop { position: absolute; inset: 0; background: rgba(20,20,18,0.35); }
+  .flt-sheet-panel {
+    position: absolute; left: 0; right: 0; bottom: 0; max-height: 88vh; overflow-y: auto;
+    background: var(--card); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.12); padding: 12px 14px calc(16px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 12px; animation: flt-sheet-in .18s ease-out;
+  }
+  @keyframes flt-sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .flt-sheet-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: var(--fs-md); }
+  .flt-main { flex-direction: column; align-items: stretch; }
+  .flt-main > * { width: 100%; }
+  .flt-more-btn { display: none; }
+  .flt-more-pop { display: flex; position: static; border: none; box-shadow: none; padding: 2px 0; min-width: 0; }
+  .flt-sheet-foot { display: flex; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .flt-sheet-panel { animation: none; } }
+
 /* ── Speakers list: stacked filters + card layout on small screens ─────────── */
 .sp-cards { display: none; }
 .sp-sort-mobile { display: none; }
 /* Logistics: card layout on small screens */
 .lg-cards { display: none; }
 @media (max-width: 640px) {
-  /* Filter controls stack instead of cramming into one row */
-  .flt-row { flex-direction: column; align-items: stretch !important; }
-  .flt-row > * { width: 100%; }
-  .flt-row .flt-more { position: static !important; }
-  .flt-row .flt-more > summary { width: 100%; text-align: center; }
-  .flt-row .flt-more > div { right: auto !important; left: 0; width: 100%; }
-
   /* The data table becomes a tappable card list */
   .sp-table { display: none; }
   .sp-cards { display: flex; flex-direction: column; gap: 10px; }
@@ -322,10 +372,6 @@ code { overflow-wrap: anywhere; }
   .sp-card .sp-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
   .sp-card .sp-edition { color: var(--muted); font-size: 12px; margin-top: 2px; }
   .sp-card .sp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
-
-  /* Pulse dashboard: hide wide table, show stacked event cards */
-  .dash-table { display: none; }
-  .dash-cards { display: flex; flex-direction: column; gap: 10px; }
 
   /* Logistics: hide wide table, show cards */
   .lg-table { display: none; }

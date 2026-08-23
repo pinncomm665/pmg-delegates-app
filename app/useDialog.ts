@@ -8,12 +8,16 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 // dashboard drawer): Esc closes, focus moves into the panel on open and is
 // restored to the previously-focused element on close, Tab is trapped inside,
 // and body scroll is locked while open. Returns the ref to put on the panel.
-export function useDialog(onClose: () => void) {
+// `enabled` lets an always-mounted panel (e.g. the list page's filters sheet,
+// which is a plain block on desktop) engage the dialog behaviour only while it
+// is actually shown as a modal.
+export function useDialog(onClose: () => void, enabled = true) {
   const ref = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
+    if (!enabled) return;
     const opener = document.activeElement as HTMLElement | null;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -37,7 +41,7 @@ export function useDialog(onClose: () => void) {
       document.body.style.overflow = prevOverflow;
       opener?.focus?.();
     };
-  }, []);
+  }, [enabled]);
 
   return ref;
 }
