@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ContactSummary, TimelineItem } from "@/lib/contactSummary";
-import type { ContactNoteLite, NoteAttachment } from "@/lib/notes";
+import { transcriptInFlight, type ContactNoteLite } from "@/lib/notes";
 import AttachmentChips from "../../AttachmentChips";
 
 // Activity timeline — the "Contact History" tab. Renders contact_summaries.timeline
@@ -21,6 +21,11 @@ import AttachmentChips from "../../AttachmentChips";
 const POLL_MS = 10_000;
 const POLL_MAX_TICKS = 12;
 const STATUS_URL = (id: string) => `/api/contact-summary/status?contact_id=${encodeURIComponent(id)}`;
+// Voice-note transcripts: light 15 s poll ONLY while a note on this page is
+// pending/processing, capped at 10 min.
+const TX_POLL_MS = 15_000;
+const TX_POLL_MAX_TICKS = 40;
+const TX_URL = (ids: string[]) => `/api/notes/transcript?ids=${encodeURIComponent(ids.join(","))}`;
 // Rows are text only — no Gmail / JustCall / Granola deep links (Addendum 2).
 
 type Phase = "idle" | "requesting" | "polling" | "timeout" | "unavailable";
@@ -93,7 +98,8 @@ function Icon({ channel }: { channel: TimelineItem["channel"] }) {
   }
 }
 
-function Row({ it, attachments }: { it: TimelineItem; attachments: NoteAttachment[] }) {
+function Row({ it, note, canRetry }: { it: TimelineItem; note: ContactNoteLite | null; canRetry: boolean }) {
+  const attachments = note?.attachments ?? [];
   const badge = badgeOf(it);
   const byLine = [it.by, it.participants && it.participants.length ? it.participants.join(", ") : null].filter(Boolean).join(" · ");
   return (
@@ -112,7 +118,12 @@ function Row({ it, attachments }: { it: TimelineItem; attachments: NoteAttachmen
             <span className="chip chip-neutral atl-outcome">{it.outcome}</span>
           </div>
         )}
-        {attachments.length > 0 && <AttachmentChips items={attachments} />}
+        {note && attachments.length > 0 && (
+          <AttachmentChips
+            items={attachments}
+            transcript={note.transcript_status ? { noteId: note.id, status: note.transcript_status, text: note.transcript, canRetry } : null}
+          />
+        )}
       </div>
     </li>
   );
@@ -120,19 +131,58 @@ function Row({ it, attachments }: { it: TimelineItem; attachments: NoteAttachmen
 
 // Manual-note attachments are matched to note rows by timestamp (the
 // generated timeline carries no note id) — ±2 min tolerance.
-function attachmentsFor(it: TimelineItem, notes: ContactNoteLite[]): NoteAttachment[] {
-  if (it.channel !== "note" || notes.length === 0) return [];
+function noteFor(it: TimelineItem, notes: ContactNoteLite[]): ContactNoteLite | null {
+  if (it.channel !== "note" || notes.length === 0) return null;
   const t = new Date(it.at).getTime();
-  if (Number.isNaN(t)) return [];
-  const hit = notes.find((n) => Math.abs(new Date(n.created_at).getTime() - t) < 120_000);
-  return hit ? hit.attachments : [];
+  if (Number.isNaN(t)) return null;
+  return notes.find((n) => Math.abs(new Date(n.created_at).getTime() - t) < 120_000) ?? null;
 }
 
-export default function ActivityTimeline({ contactId, initial, noteAttachments = [] }: { contactId: string; initial: ContactSummary | null; noteAttachments?: ContactNoteLite[] }) {
+// viewerEmail / viewerElevated: who may Retry a failed transcript (admin /
+// reviewer → any note; otherwise only the note's author). Enforced server-side too.
+export default function ActivityTimeline({ contactId, initial, noteAttachments = [], viewerEmail = "", viewerElevated = false }: { contactId: string; initial: ContactSummary | null; noteAttachments?: ContactNoteLite[]; viewerEmail?: string; viewerElevated?: boolean }) {
   const [row, setRow] = useState<ContactSummary | null>(initial);
   const [phase, setPhase] = useState<Phase>("idle");
   const ticks = useRef(0);
   const requested = useRef(false);
+
+  // Manual notes (attachments + transcript state). Re-synced when the server
+  // component re-renders (router.refresh after Log activity) and refreshed by
+  // the transcript poller while any note is in flight.
+  const [notes, setNotes] = useState<ContactNoteLite[]>(noteAttachments);
+  useEffect(() => { setNotes(noteAttachments); }, [noteAttachments]);
+  const txTicks = useRef(0);
+  const txPending = notes.some((n) => transcriptInFlight(n.transcript_status));
+  useEffect(() => {
+    if (!txPending) { txTicks.current = 0; return; }
+    let stopped = false;
+    const tick = async () => {
+      txTicks.current += 1;
+      const ids = notes.filter((n) => transcriptInFlight(n.transcript_status)).map((n) => n.id);
+      if (ids.length === 0) return;
+      try {
+        const r = await fetch(TX_URL(ids), { cache: "no-store" });
+        if (!r.ok || stopped) return;
+        const d = await r.json();
+        const got: { note_id: string; status: ContactNoteLite["transcript_status"]; text: string | null }[] = Array.isArray(d?.notes) ? d.notes : [];
+        if (!got.length || stopped) return;
+        setNotes((prev) => {
+          let changed = false;
+          const next = prev.map((n) => {
+            const g = got.find((x) => x.note_id === n.id);
+            if (!g || (g.status === n.transcript_status && (g.text ?? null) === n.transcript)) return n;
+            changed = true;
+            return { ...n, transcript_status: g.status, transcript: g.text ?? null };
+          });
+          return changed ? next : prev;
+        });
+      } catch {}
+      if (!stopped && txTicks.current >= TX_POLL_MAX_TICKS) clearInterval(t);
+    };
+    const t = setInterval(tick, TX_POLL_MS);
+    return () => { stopped = true; clearInterval(t); };
+  }, [txPending, notes]);
+  const canRetryFor = (n: ContactNoteLite | null) => !!n && (viewerElevated || (!!viewerEmail && !!n.author_email && n.author_email.toLowerCase() === viewerEmail.toLowerCase()));
 
   const request = useCallback(async (force: boolean) => {
     setPhase("requesting");
@@ -271,7 +321,7 @@ export default function ActivityTimeline({ contactId, initial, noteAttachments =
 
       {hasItems && (
         <ol className="atl-list">
-          {items.map((it, i) => <Row key={`${it.at}-${i}`} it={it} attachments={attachmentsFor(it, noteAttachments)} />)}
+          {items.map((it, i) => { const n = noteFor(it, notes); return <Row key={`${it.at}-${i}`} it={it} note={n} canRetry={canRetryFor(n)} />; })}
         </ol>
       )}
     </section>

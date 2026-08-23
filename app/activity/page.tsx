@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/session";
+import { requireUser, isReviewer } from "@/lib/session";
 import {
   getActivityFeed,
   getActivityOwners,
@@ -87,6 +87,8 @@ export default async function ActivityPage({
         page={page}
         pageCount={pageCount}
         pageSize={PAGE_SIZE}
+        viewerEmail={user.email}
+        viewerElevated={isReviewer(user)}
       />
     </Shell>
   );

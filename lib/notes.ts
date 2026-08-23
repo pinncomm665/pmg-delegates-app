@@ -114,7 +114,27 @@ export async function insertContactNote(input: InsertNoteInput): Promise<InsertN
   return { ok: false, error: "Could not save the note (schema mismatch)" };
 }
 
-export type ContactNoteLite = { id: string; created_at: string; channel: string | null; attachments: NoteAttachment[] };
+// ── Voice-note transcription (pmg-agent contact_notes.transcript*) ──────────
+// Columns `transcript`, `transcript_status`, `transcript_error`,
+// `transcribed_at` arrive with the pmg-agent transcription migration; every
+// read below tolerates their absence (falls back to the pre-transcript select).
+export const TRANSCRIPT_STATUSES = ["pending", "processing", "ready", "error", "skipped"] as const;
+export type TranscriptStatus = (typeof TRANSCRIPT_STATUSES)[number];
+export const isTranscriptStatus = (v: unknown): v is TranscriptStatus => typeof v === "string" && (TRANSCRIPT_STATUSES as readonly string[]).includes(v);
+export const transcriptInFlight = (s: TranscriptStatus | null | undefined): boolean => s === "pending" || s === "processing";
+export const hasVoiceAttachment = (atts: NoteAttachment[]): boolean => atts.some((a) => a.kind === "voice" || (a.type || "").toLowerCase().startsWith("audio/"));
+
+export type NoteTranscript = { note_id: string; status: TranscriptStatus | null; text: string | null; author_email: string | null };
+
+export type ContactNoteLite = {
+  id: string;
+  created_at: string;
+  channel: string | null;
+  attachments: NoteAttachment[];
+  author_email: string | null;
+  transcript: string | null;
+  transcript_status: TranscriptStatus | null;
+};
 
 function parseAttachments(v: unknown): NoteAttachment[] {
   if (!Array.isArray(v)) return [];
@@ -130,36 +150,90 @@ function parseAttachments(v: unknown): NoteAttachment[] {
     }));
 }
 
-// Notes with attachments for one contact (timeline chips). Best-effort: the
-// attachments column may not exist yet → [].
+const isMissingColumnErr = (msg: string, cols: RegExp) => cols.test(msg) && /does not exist|schema cache/i.test(msg);
+
+// Best-effort flags: flipped the first time PostgREST says a column is absent.
 let attachmentsColumnMissing = false;
+let transcriptColumnsMissing = false;
+
+const NOTE_SELECT_FULL = "id, contact_id, created_at, channel, attachments, author_email, transcript, transcript_status";
+const NOTE_SELECT_BASE = "id, contact_id, created_at, channel, attachments";
+
+// Runs `build(select)` with the transcript columns first, then without them
+// when the schema doesn't have them yet. Returns null when even the base
+// select fails (attachments column missing → caller returns empty).
+async function selectNotes(build: (select: string) => PromiseLike<{ data: any[] | null; error: any }>): Promise<any[] | null> {
+  if (!transcriptColumnsMissing) {
+    const { data, error } = await build(NOTE_SELECT_FULL);
+    if (!error) return data ?? [];
+    if (isMissingColumnErr(String(error.message ?? ""), /transcript|author_email/)) transcriptColumnsMissing = true;
+    else if (isMissingColumnErr(String(error.message ?? ""), /attachments|channel/)) { attachmentsColumnMissing = true; return null; }
+    else return null;
+  }
+  const { data, error } = await build(NOTE_SELECT_BASE);
+  if (error) {
+    if (isMissingColumnErr(String(error.message ?? ""), /attachments|channel/)) attachmentsColumnMissing = true;
+    return null;
+  }
+  return data ?? [];
+}
+
+function toLite(r: any): ContactNoteLite {
+  return {
+    id: String(r.id),
+    created_at: r.created_at,
+    channel: r.channel ?? null,
+    attachments: parseAttachments(r.attachments),
+    author_email: typeof r.author_email === "string" ? r.author_email : null,
+    transcript: typeof r.transcript === "string" && r.transcript.trim() ? r.transcript : null,
+    transcript_status: isTranscriptStatus(r.transcript_status) ? r.transcript_status : null,
+  };
+}
+
+// Notes with attachments for one contact (timeline chips + transcript state).
+// Best-effort: the attachments column may not exist yet → [].
 export async function getContactNoteAttachments(contactId: string): Promise<ContactNoteLite[]> {
   if (attachmentsColumnMissing) return [];
   try {
     const sb = supabaseAdmin();
-    const { data, error } = await sb
-      .from("contact_notes")
-      .select("id, created_at, channel, attachments")
-      .eq("contact_id", contactId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(200);
-    if (error) {
-      if (/attachments|channel/.test(error.message) && /does not exist|schema cache/i.test(error.message)) attachmentsColumnMissing = true;
-      return [];
-    }
-    return (data ?? [])
-      .map((r: any) => ({ id: r.id, created_at: r.created_at, channel: r.channel ?? null, attachments: parseAttachments(r.attachments) }))
-      .filter((r) => r.attachments.length > 0);
+    const rows = await selectNotes((select) =>
+      sb.from("contact_notes").select(select).eq("contact_id", contactId).is("deleted_at", null).order("created_at", { ascending: false }).limit(200)
+    );
+    return (rows ?? []).map(toLite).filter((r) => r.attachments.length > 0);
   } catch {
     return [];
   }
 }
 
-// Attachments for a page of feed rows. The view's `id` is text — we match
+// Transcript state for a set of note ids (the detail-page poller). Tolerates
+// the columns being absent → status null for every id.
+export async function getNoteTranscripts(noteIds: string[]): Promise<NoteTranscript[]> {
+  const ids = Array.from(new Set(noteIds.map((s) => String(s).toLowerCase()).filter((s) => /^[0-9a-f-]{36}$/.test(s)))).slice(0, 200);
+  if (ids.length === 0) return [];
+  try {
+    const sb = supabaseAdmin();
+    const rows = await selectNotes((select) => sb.from("contact_notes").select(select).in("id", ids).is("deleted_at", null).limit(200));
+    return (rows ?? []).map((r: any) => {
+      const n = toLite(r);
+      return { note_id: n.id, status: n.transcript_status, text: n.transcript, author_email: n.author_email };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// Note meta for a page of feed rows. The view's `id` is text — we match
 // either an embedded note uuid or (contact_id, at) pairs. Best-effort.
-export async function getAttachmentsForFeed(rows: { id: string; contact_id: string | null; at: string; source: string | null }[]): Promise<Map<string, NoteAttachment[]>> {
-  const out = new Map<string, NoteAttachment[]>();
+export type FeedNoteMeta = {
+  note_id: string;
+  attachments: NoteAttachment[];
+  author_email: string | null;
+  transcript: string | null;
+  transcript_status: TranscriptStatus | null;
+};
+
+export async function getAttachmentsForFeed(rows: { id: string; contact_id: string | null; at: string; source: string | null }[]): Promise<Map<string, FeedNoteMeta>> {
+  const out = new Map<string, FeedNoteMeta>();
   if (attachmentsColumnMissing) return out;
   const cand = rows.filter((r) => r.contact_id && (!r.source || /note/i.test(r.source)));
   if (cand.length === 0) return out;
@@ -169,27 +243,60 @@ export async function getAttachmentsForFeed(rows: { id: string; contact_id: stri
     const ats = cand.map((r) => new Date(r.at).getTime()).filter((n) => !Number.isNaN(n));
     const lo = new Date(Math.min(...ats) - 120_000).toISOString();
     const hi = new Date(Math.max(...ats) + 120_000).toISOString();
-    const { data, error } = await sb
-      .from("contact_notes")
-      .select("id, contact_id, created_at, attachments")
-      .in("contact_id", ids)
-      .gte("created_at", lo)
-      .lte("created_at", hi)
-      .is("deleted_at", null)
-      .limit(500);
-    if (error) {
-      if (/attachments/.test(error.message) && /does not exist|schema cache/i.test(error.message)) attachmentsColumnMissing = true;
-      return out;
-    }
-    const notes = (data ?? []).map((r: any) => ({ id: String(r.id), contact_id: r.contact_id, t: new Date(r.created_at).getTime(), attachments: parseAttachments(r.attachments) })).filter((n) => n.attachments.length);
+    const rows2 = await selectNotes((select) =>
+      sb.from("contact_notes").select(select).in("contact_id", ids).gte("created_at", lo).lte("created_at", hi).is("deleted_at", null).limit(500)
+    );
+    const notes = (rows2 ?? [])
+      .map((r: any) => ({ lite: toLite(r), contact_id: r.contact_id as string, t: new Date(r.created_at).getTime() }))
+      .filter((n) => n.lite.attachments.length);
     if (!notes.length) return out;
+    const meta = (n: (typeof notes)[number]): FeedNoteMeta => ({
+      note_id: n.lite.id,
+      attachments: n.lite.attachments,
+      author_email: n.lite.author_email,
+      transcript: n.lite.transcript,
+      transcript_status: n.lite.transcript_status,
+    });
     for (const r of cand) {
-      const byId = notes.find((n) => r.id.toLowerCase().includes(n.id.toLowerCase()));
-      if (byId) { out.set(r.id, byId.attachments); continue; }
+      const byId = notes.find((n) => r.id.toLowerCase().includes(n.lite.id.toLowerCase()));
+      if (byId) { out.set(r.id, meta(byId)); continue; }
       const t = new Date(r.at).getTime();
       const near = notes.find((n) => n.contact_id === r.contact_id && Math.abs(n.t - t) < 2_000);
-      if (near) out.set(r.id, near.attachments);
+      if (near) out.set(r.id, meta(near));
     }
   } catch {}
   return out;
+}
+
+// ── Transcription trigger ───────────────────────────────────────────────────
+// Marks the note pending (ignoring a missing column) and POSTs the pmg-agent
+// internal route fire-and-forget — the save never waits on it and every
+// failure is swallowed. Returns whether the request was actually dispatched.
+const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
+
+export async function requestTranscription(noteId: string): Promise<boolean> {
+  const id = String(noteId || "").toLowerCase();
+  if (!/^[0-9a-f-]{36}$/.test(id)) return false;
+  try {
+    const sb = supabaseAdmin();
+    const { error } = await sb.from("contact_notes").update({ transcript_status: "pending", transcript_error: null }).eq("id", id);
+    if (error) {
+      if (isMissingColumnErr(String(error.message ?? ""), /transcript/)) transcriptColumnsMissing = true;
+      // A missing column means pmg-agent hasn't shipped transcription yet —
+      // still fire the request; the route may land before the column does.
+    }
+  } catch {}
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  try {
+    void fetch(`${AGENT_BASE}/api/internal/transcribe-note`, {
+      method: "POST",
+      headers: { "x-cron-secret": secret, "Content-Type": "application/json" },
+      body: JSON.stringify({ note_id: id }),
+      cache: "no-store",
+    }).catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
 }

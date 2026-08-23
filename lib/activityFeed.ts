@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "./supabaseAdmin";
-import { getAttachmentsForFeed, type NoteAttachment } from "./notes";
+import { getAttachmentsForFeed, type NoteAttachment, type TranscriptStatus } from "./notes";
 
 // Activity Report — reads the pmg-agent VIEW `public.team_activity_feed`
 // (mig 217) with the service key. One row per team touch across ALL contacts
@@ -42,6 +42,11 @@ export type ActivityFeedRow = {
   detail_href: string | null;
   // Manual-note attachments (files / voice notes), when the row is a contact_note.
   attachments: NoteAttachment[];
+  // The underlying contact_note (when matched) + its voice-transcript state.
+  note_id: string | null;
+  note_author: string | null;
+  transcript_status: TranscriptStatus | null;
+  transcript: string | null;
 };
 
 export type ActivityFeedFilters = {
@@ -154,7 +159,11 @@ export async function getActivityFeed(filters: ActivityFeedFilters): Promise<Act
       const id = String(r.id ?? `${r.source ?? "row"}:${r.at ?? ""}:${r.contact_id ?? ""}`);
       return {
         id,
-        attachments: att.get(String(r.id ?? "")) ?? [],
+        attachments: att.get(String(r.id ?? ""))?.attachments ?? [],
+        note_id: att.get(String(r.id ?? ""))?.note_id ?? null,
+        note_author: att.get(String(r.id ?? ""))?.author_email ?? null,
+        transcript_status: att.get(String(r.id ?? ""))?.transcript_status ?? null,
+        transcript: att.get(String(r.id ?? ""))?.transcript ?? null,
         at: r.at,
         contact_id: r.contact_id ?? null,
         contact_name: r.contact_name ?? null,

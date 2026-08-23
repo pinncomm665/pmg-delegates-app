@@ -1,4 +1,5 @@
-import { fmtDuration, type NoteAttachment } from "@/lib/notes";
+import { fmtDuration, hasVoiceAttachment, type NoteAttachment } from "@/lib/notes";
+import TranscriptNote, { type TranscriptProps } from "./TranscriptNote";
 
 // Small attachment chips for a manual note: files open in a new tab via the
 // signed-URL route; voice notes render an inline player. Server-safe.
@@ -11,9 +12,13 @@ function fmtSize(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function AttachmentChips({ items, compact = false }: { items: NoteAttachment[]; compact?: boolean }) {
+// `transcript` (optional) — the parent note's voice-transcript state; rendered
+// once under the chips when the note carries a voice attachment.
+export default function AttachmentChips({ items, compact = false, transcript }: { items: NoteAttachment[]; compact?: boolean; transcript?: Omit<TranscriptProps, "compact"> | null }) {
   if (!items || items.length === 0) return null;
+  const tx = transcript && hasVoiceAttachment(items) ? transcript : null;
   return (
+    <>
     <div className={`att-chips${compact ? " is-compact" : ""}`}>
       {items.map((a, i) =>
         a.kind === "voice" ? (
@@ -32,5 +37,7 @@ export default function AttachmentChips({ items, compact = false }: { items: Not
         )
       )}
     </div>
+    {tx && <TranscriptNote {...tx} compact={compact} />}
+    </>
   );
 }
