@@ -639,3 +639,50 @@ select.input { padding-right: 32px; }
   .ai-sum.is-collapsed .ai-sum-body { display: none; }
   .ai-sum.is-collapsed .ai-sum-head { margin: 0; }
 }
+
+/* ── Activity timeline (Contact History tab) ─────────────────────────────── */
+.atl { display: flex; flex-direction: column; gap: var(--gap-2); }
+.atl-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.atl-state { gap: 6px; }
+.atl-state .btn-spin { width: 10px; height: 10px; border-width: 1.5px; }
+.atl-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; position: relative; }
+.atl-list::before { content: ""; position: absolute; left: 13px; top: 14px; bottom: 14px; width: 1px; background: var(--border); }
+.atl-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; padding: 10px 0; position: relative; }
+.atl-row + .atl-row { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.atl-icon { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--border); color: var(--muted); position: relative; z-index: 1; }
+.atl-call .atl-icon, .atl-meeting .atl-icon { color: var(--info); border-color: color-mix(in srgb, var(--info) 40%, var(--border)); }
+.atl-instantly .atl-icon { color: var(--warn); }
+.atl-stage .atl-icon { color: var(--accent); }
+.atl-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.atl-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.atl-date { color: var(--muted); white-space: nowrap; }
+.atl-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: var(--hover); color: var(--muted); white-space: nowrap; }
+.atl-b-sent { background: var(--hover); color: var(--text); }
+.atl-b-replied { background: color-mix(in srgb, var(--accent) 14%, var(--card)); color: var(--accent); }
+.atl-b-thread { background: var(--hover); color: var(--muted); }
+.atl-b-call, .atl-b-meeting { background: var(--info-bg); color: var(--info); }
+.atl-b-instantly { background: var(--warn-bg); color: var(--warn); }
+.atl-b-stage { background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); }
+.atl-b-note { background: var(--hover); color: var(--muted); }
+.atl-by { font-size: var(--fs-sm); }
+.atl-title { font-size: var(--fs-md); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.atl-title a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--info) 45%, transparent); text-underline-offset: 2px; }
+.atl-title a:hover { color: var(--info); }
+.atl-summary { margin: 0; font-size: var(--fs-sm); line-height: 1.5; max-width: 78ch; }
+.atl-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.atl-outcome { white-space: normal; line-height: 1.45; padding: 2px 9px; font-weight: 600; font-size: var(--fs-xs); color: var(--text); }
+.atl-link { font-size: var(--fs-sm); color: var(--info); white-space: nowrap; }
+.atl-error { color: var(--danger); }
+.atl-skel { display: flex; flex-direction: column; gap: 10px; max-width: 78ch; }
+.atl-skel-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.atl-skel-dot { display: block; width: 28px; height: 28px; border-radius: 50%; }
+.atl-skel-lines { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.atl-skel-line { display: block; height: 11px; width: 100%; }
+.atl-skel-line.short { width: 42%; }
+
+/* ── JustCall click-to-dial (shared dialer, ported from pmg-sales-app) ─────── */
+.call-btn { padding: 0 6px; min-width: var(--control-h-sm); margin-left: 4px; vertical-align: middle; }
+.call-btn svg { width: 14px; height: 14px; }
+.dialer-panel { position: fixed; right: 16px; bottom: 16px; z-index: 80; width: 380px; max-width: calc(100vw - 24px); height: 620px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.2); transition: opacity .25s, transform .25s, visibility .25s; }
+.dialer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+@media (max-width: 640px) { .dialer-panel { right: 12px; left: 12px; width: auto; bottom: calc(12px + env(safe-area-inset-bottom)); } }

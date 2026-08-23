@@ -8,6 +8,7 @@ import { splitForEdit, fullNameFrom, type FieldWriteResult } from "@/lib/contact
 import { formatPhone, PHONE_HINT_TEXT } from "@/lib/phone";
 import { DetailRow, InlineEditor, PromoteIcon } from "./FieldEditor";
 import UpdateCompany from "./UpdateCompany";
+import CallButton from "../../CallButton";
 import {
   updateName,
   updateJobTitle,
@@ -378,7 +379,7 @@ export default function ContactDetails({
         />
         <DetailRow
           label="Phone"
-          value={<>{formatPhone(c.office_phone) || <Empty />}<QueuedChip k="office_phone" /></>}
+          value={<>{formatPhone(c.office_phone) || <Empty />}<CallButton phone={c.office_phone} name={c.full_name_clean} /><QueuedChip k="office_phone" /></>}
           editing={editing === "office_phone"}
           onEdit={() => open("office_phone")}
           disabled={busy}
@@ -390,7 +391,7 @@ export default function ContactDetails({
         />
         <DetailRow
           label="Mobile"
-          value={<>{formatPhone(c.mobile) || <Empty />}<QueuedChip k="mobile" /></>}
+          value={<>{formatPhone(c.mobile) || <Empty />}<CallButton phone={c.mobile} name={c.full_name_clean} /><QueuedChip k="mobile" /></>}
           editing={editing === "mobile"}
           onEdit={() => open("mobile")}
           disabled={busy}
@@ -402,7 +403,7 @@ export default function ContactDetails({
         />
         <DetailRow
           label="Other phone"
-          value={<>{formatPhone(c.other_phone) || <Empty />}<QueuedChip k="other_phone" /></>}
+          value={<>{formatPhone(c.other_phone) || <Empty />}<CallButton phone={c.other_phone} name={c.full_name_clean} /><QueuedChip k="other_phone" /></>}
           editing={editing === "other_phone"}
           onEdit={() => open("other_phone")}
           disabled={busy}

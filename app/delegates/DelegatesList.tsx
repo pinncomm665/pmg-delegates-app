@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import CallButton from "../CallButton";
 import { useDialog } from "../useDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -313,7 +314,7 @@ export default function DelegatesList({
                 <td className="muted">{r.company}</td>
                 <td className="muted">{r.edition}</td>
                 {showEmail && <td className="muted" style={{ fontSize: 13, overflowWrap: "anywhere" }}>{r.email ?? "—"}</td>}
-                {showPhone && <td className="muted" style={{ fontSize: 13, whiteSpace: "nowrap" }}>{r.phone ?? "—"}</td>}
+                {showPhone && <td className="muted" style={{ fontSize: 13, whiteSpace: "nowrap" }}>{r.phone ?? "—"}<CallButton phone={r.phone} name={r.name} /></td>}
                 {showLinkedin && (
                   <td className="muted" style={{ fontSize: 13 }}>
                     {r.linkedin ? <a href={r.linkedin} target="_blank" rel="noreferrer" title={r.linkedin}>{linkedinSlug(r.linkedin)}</a> : "—"}

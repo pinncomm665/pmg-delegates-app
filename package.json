@@ -8,6 +8,7 @@
     "start": "next start -p ${PORT:-3000}"
   },
   "dependencies": {
+    "@justcall/justcall-dialer-sdk": "^1.4.2",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "libphonenumber-js": "^1.13.11",

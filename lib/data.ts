@@ -549,7 +549,9 @@ export async function getContactSummary(contactId: string): Promise<import("./co
     const sb = supabaseAdmin();
     const { data, error } = await sb
       .from("contact_summaries")
-      .select("contact_id, summary_md, facts, status, error, generated_at, updated_at")
+      // `*` (not a column list): the `timeline` column lands with migration 215 —
+      // a named select would 400 until it's applied and blank the whole card.
+      .select("*")
       .eq("contact_id", contactId)
       .maybeSingle();
     if (error || !data) return null;
@@ -558,6 +560,7 @@ export async function getContactSummary(contactId: string): Promise<import("./co
       contact_id: row.contact_id,
       summary_md: row.summary_md ?? null,
       facts: (row.facts && typeof row.facts === "object" ? row.facts : {}) as any,
+      timeline: Array.isArray(row.timeline) ? row.timeline : [],
       status: row.status ?? "ready",
       error: row.error ?? null,
       generated_at: row.generated_at ?? null,

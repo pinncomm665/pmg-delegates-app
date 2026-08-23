@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireUser, isAdmin, isReviewer } from "@/lib/session";
 import { getDelegate, getContactProfile, getContactSummary, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
 import AISummary from "./AISummary";
-import EmailHistory from "./EmailHistory";
+import ActivityTimeline from "./ActivityTimeline";
 import ProfileTabs from "./ProfileTabs";
 import { companyDisplay } from "@/lib/company";
 import RegistrationForm from "./RegistrationForm";
@@ -150,12 +150,11 @@ export default async function DelegateDetail({
               </ContactDetails>
             }
             history={
-              <div className="fieldset-stack">
-                <div>
-                  <p className="section-title" style={{ marginBottom: 12 }}>Email history</p>
-                  <EmailHistory emails={[c.email, c.personal_email]} />
-                </div>
-              </div>
+              c.id ? (
+                <ActivityTimeline contactId={c.id} initial={summary} />
+              ) : (
+                <p className="muted" style={{ fontSize: 13 }}>No activity recorded yet.</p>
+              )
             }
             registration={
               <div className="fieldset-stack">
