@@ -441,6 +441,39 @@ export async function updateJobTitle(delegateId: string, title: string): Promise
   return { ok: true, message: "Job title updated", value: t || null };
 }
 
+// Personal email — Tier A: auto-apply + log (kind 'email', field
+// 'personal_email'). Warm/manual contact only — NEVER an outbound address, so
+// no MillionVerifier call and no Instantly/Brevo touch. Empty string clears.
+const PERSONAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export async function updatePersonalEmail(delegateId: string, value: string, returnTo?: string): Promise<FieldWriteResult> {
+  const raw = value.trim();
+  let v: string | null = null;
+  if (raw) {
+    if (!PERSONAL_EMAIL_RE.test(raw)) return { ok: false, message: "Enter a valid email address." };
+    const at = raw.lastIndexOf("@");
+    v = raw.slice(0, at) + "@" + raw.slice(at + 1).toLowerCase();
+  }
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const current: string | null = d.contact?.personal_email ?? null;
+  if ((current ?? "") === (v ?? "")) return { ok: true, message: "Personal email unchanged", value: current };
+  const entry = { ...base(d), kind: "email" as const, field: "personal_email", current_value: current, proposed_value: v };
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({ personal_email: v, user_managed_fields: managedWith(d, "personal_email") })
+    .eq("id", d.contact?.id);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  if (returnTo && returnTo.startsWith("/")) revalidatePath(returnTo);
+  return { ok: true, message: "Personal email updated", value: v };
+}
+
 export type PhoneField = "mobile" | "office_phone" | "other_phone";
 const PHONE_FIELDS: PhoneField[] = ["mobile", "office_phone", "other_phone"];
 
