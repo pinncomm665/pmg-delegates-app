@@ -12,6 +12,7 @@ import { companyDisplay } from "@/lib/company";
 import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
 import { normalizePhone } from "@/lib/phone";
 import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
+import { cleanNameFields } from "@/lib/nameClean";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);
@@ -469,9 +470,13 @@ export async function undoPromotePersonalEmail(
 // Name — Tier C identity change: QUEUED (kind 'role', field 'name'). Admin /
 // reviewer apply immediately (they could approve it anyway) + log.
 export async function updateName(delegateId: string, first: string, last: string): Promise<FieldWriteResult> {
-  const f = properCaseName(first);
-  const l = properCaseName(last);
-  const full = fullNameFrom(f, l);
+  // CRM name engine (lib/nameClean.ts, ported from pmg-agent): honorifics and
+  // credentials stripped, "LASTNAME, First" handled, engine casing. properCaseName
+  // is only the fallback when the engine returns nothing for a box.
+  const cleaned = cleanNameFields(first, last);
+  const f = cleaned.first || properCaseName(first);
+  const l = cleaned.last || (cleaned.first ? "" : properCaseName(last));
+  const full = cleaned.full || fullNameFrom(f, l);
   if (full.length < 2) return { ok: false, message: "Enter the person’s name." };
   const ctx = await fieldContext(delegateId);
   if ("denied" in ctx) return ctx.denied;

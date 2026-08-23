@@ -98,9 +98,15 @@ export function normalizePhone(raw: string, hints: PhoneHints = {}): PhoneResult
   const valid = candidates.find((n) => n!.isValid());
   if (valid) return finish(valid)!;
 
-  // 3. Typed without "+" but already carrying a country code ("60193107646").
-  const intl = parsePhoneNumberFromString("+" + s);
-  if (intl && intl.isValid()) return finish(intl)!;
+  // 3. Last-resort guess: typed without "+" but already carrying a country code
+  //    ("60193107646", "971567773742" on an SA contact, "353868385969" with no
+  //    hints). Accepted ONLY when "+digits" is a fully VALID number with no
+  //    default country; 9–15 digits (E.164 bounds) — "255" must still fail.
+  const digits = s.replace(/\D/g, "");
+  if (digits.length >= 9 && digits.length <= 15) {
+    const intl = parsePhoneNumberFromString("+" + digits);
+    if (intl && intl.isValid()) return finish(intl)!;
+  }
 
   // 4. Last resort: a hint country that makes it at least *possible*.
   const possible = candidates.find((n) => n!.isPossible());

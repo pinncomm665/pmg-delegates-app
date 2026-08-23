@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { normalizePhone, formatPhone, countryIsoFromEdition } from "../lib/phone.ts";
 import { titleCaseJobTitle, properCaseName, normalizeEmail } from "../lib/textCase.ts";
 import { canonicalizeLinkedinUrl } from "../lib/contactFields.ts";
+import { cleanNameFields, cleanFullName, splitName } from "../lib/nameClean.ts";
 
 const e164 = (r: ReturnType<typeof normalizePhone>) => ("e164" in r ? r.e164 : `ERROR: ${r.error}`);
 
@@ -14,6 +15,9 @@ assert.equal(e164(normalizePhone("60193107646", { countryIso: "MY" })), "+601931
 assert.equal(e164(normalizePhone("019-310 7646", { editionCountry: "10DX Malaysia 2026" })), "+60193107646");
 assert.equal(e164(normalizePhone("0803 535 8808", { companyCountryIso: "ng" })), "+2348035358808");
 assert.ok("error" in normalizePhone("8035358808", {}), "no hints → error");
+assert.equal(e164(normalizePhone("971567773742", { countryIso: "SA" })), "+971567773742");
+assert.equal(e164(normalizePhone("353868385969", {})), "+353868385969");
+assert.ok("error" in normalizePhone("255", { countryIso: "TZ" }), "bare country code → error");
 assert.ok("error" in normalizePhone("8035358808", { editionCountry: "4WARD MENA 2027" }), "region edition → no country → error");
 assert.ok("error" in normalizePhone("", { countryIso: "NG" }), "empty → error");
 assert.equal(countryIsoFromEdition("VERIFY Saudi Arabia 2026"), "SA");
@@ -50,5 +54,16 @@ assert.equal(canonicalizeLinkedinUrl("https://ww.linkedin.com/in/john-doe?trk=x#
 assert.equal(canonicalizeLinkedinUrl("http://mobile.linkedin.com/in/john-doe"), LI);
 assert.equal(canonicalizeLinkedinUrl("https://twitter.com/in/john-doe"), null);
 assert.equal(canonicalizeLinkedinUrl("ab"), null);
+
+// ── name engine (port of pmg-agent splitName) ───────────────────────────────
+assert.deepEqual(cleanNameFields("Dr. Hassan Dajani, PE, PMP", ""), { first: "Hassan", last: "Dajani", full: "Hassan Dajani" });
+assert.deepEqual(cleanNameFields("SMITH, john", ""), { first: "John", last: "Smith", full: "John Smith" });
+assert.deepEqual(cleanNameFields("aBIMBOLA", "ademola"), { first: "Abimbola", last: "Ademola", full: "Abimbola Ademola" });
+assert.deepEqual(cleanNameFields("Mr. Ahmed", "Khan MBA"), { first: "Ahmed", last: "Khan", full: "Ahmed Khan" });
+assert.deepEqual(cleanNameFields("jan", "van der merwe"), { first: "Jan", last: "van der Merwe", full: "Jan van der Merwe" });
+assert.deepEqual(cleanNameFields("M. Yousuf Mirza", ""), { first: "Yousuf", last: "Mirza", full: "Yousuf Mirza" });
+assert.equal(cleanFullName("mohammed al maktoum, phd"), "Mohammed Al Maktoum");
+assert.equal(splitName("Syed Faisal Abbas").first, "Syed Faisal");
+assert.equal(cleanNameFields("", "").full, "");
 
 console.log("phone.test.ts: all assertions passed");
