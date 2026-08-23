@@ -10,18 +10,18 @@ import { removeDelegate } from "./actions";
 export default function RemoveDelegateDialog({ delegateId, ret, name }: { delegateId: string; ret: string; name: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <details style={{ marginTop: 24 }}>
-      <summary style={{ cursor: "pointer", fontSize: 14, color: "var(--danger)" }}>
-        Remove from delegates (no longer attending)
-      </summary>
-      <p className="muted" style={{ fontSize: 12, margin: "10px 0" }}>
-        Permanently removes this delegate role row — use when the person should no
-        longer be tracked for this event. Secured delegates
-        (registered / confirmed / attended) can’t be removed.
-      </p>
-      <button className="btn btn-danger" type="button" onClick={() => setOpen(true)}>Remove…</button>
+    <section className="fieldset danger" aria-label="Danger zone">
+      <div className="fieldset-head">
+        <p className="section-title">Remove from delegates</p>
+        <p className="section-sub">
+          Permanently removes this delegate role row — use when the person should no longer be tracked for this event. Secured delegates (registered / confirmed / attended) can’t be removed.
+        </p>
+      </div>
+      <div className="form-actions">
+        <button className="btn btn-danger btn-sm" type="button" onClick={() => setOpen(true)}>Remove…</button>
+      </div>
       {open && <Confirm delegateId={delegateId} ret={ret} name={name} onClose={() => setOpen(false)} />}
-    </details>
+    </section>
   );
 }
 
@@ -48,9 +48,11 @@ function Confirm({ delegateId, ret, name, onClose }: { delegateId: string; ret: 
         <form action={removeDelegate}>
           <input type="hidden" name="delegateId" value={delegateId} />
           <input type="hidden" name="return" value={ret} />
-          <label htmlFor="rm-confirm">Confirmation</label>
-          <input id="rm-confirm" name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="REMOVE" autoComplete="off" />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+          <div className="field">
+            <label htmlFor="rm-confirm">Confirmation</label>
+            <input id="rm-confirm" className="input" name="confirm" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="REMOVE" autoComplete="off" />
+          </div>
+          <div className="form-actions" style={{ justifyContent: "flex-end", marginTop: 14 }}>
             <button className="btn" type="button" onClick={onClose}>Cancel</button>
             <button className="btn btn-danger" type="submit" disabled={!ok}>Remove delegate</button>
           </div>

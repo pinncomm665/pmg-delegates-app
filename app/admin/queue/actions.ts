@@ -57,6 +57,19 @@ export async function approveRequest(formData: FormData) {
       })
       .eq("id", req.contact_id);
     applied = `Email updated to ${req.proposed_value}`;
+  } else if (req.kind === "role" && req.field === "name" && req.proposed_value) {
+    // Inline name editor (ContactDetails): proposed_value = the new full name.
+    const full = String(req.proposed_value).trim().replace(/\s+/g, " ");
+    const parts = full.split(" ");
+    await sb
+      .from("contacts")
+      .update({
+        full_name_clean: full,
+        first_name_clean: parts[0] ?? null,
+        last_name_clean: parts.length > 1 ? parts.slice(1).join(" ") : null,
+      })
+      .eq("id", req.contact_id);
+    applied = `Name changed to ${full}`;
   } else if (req.kind === "role") {
     const patch: Record<string, any> = {};
     if (req.proposed_value) patch.job_title = req.proposed_value;

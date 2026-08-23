@@ -136,7 +136,7 @@ export async function getDashboard(): Promise<DashboardData> {
 
 // Whitelisted contact fields the Delegates app is allowed to read.
 const CONTACT_FIELDS =
-  "id, full_name_clean, job_title, email, personal_email, phone, mobile, office_phone, other_phone, linkedin_url_canonical, location_country, email_mv_result, email_verified_status, scrubby_result, profile_brief, company_id, company_name_submitted, user_managed_fields, profile_image_url";
+  "id, full_name_clean, first_name_clean, last_name_clean, job_title, email, personal_email, phone, mobile, office_phone, other_phone, linkedin_url_canonical, location_country, email_mv_result, email_verified_status, scrubby_result, profile_brief, company_id, company_name_submitted, user_managed_fields, profile_image_url";
 
 export async function searchCompanies(
   q: string
@@ -166,6 +166,7 @@ export async function getCompanyById(id: string): Promise<{ id: string; name: st
 export type DelegateRow = {
   id: string;
   stage: string | null;
+  stage_updated_at?: string | null;
   event_brand: string | null;
   event_edition: string | null;
   event_id: string | null;
@@ -346,7 +347,7 @@ export async function getDelegate(id: string): Promise<DelegateRow | null> {
   const { data, error } = await sb
     .from("delegates")
     .select(
-      `id, stage, event_brand, event_edition, event_id, ${REGISTRATION_FIELDS},
+      `id, stage, stage_updated_at, event_brand, event_edition, event_id, ${REGISTRATION_FIELDS},
        contact:contacts(${CONTACT_FIELDS}, company:companies(name:company_name_canonical, domain_root))`
     )
     .eq("id", id)

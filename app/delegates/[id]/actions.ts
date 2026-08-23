@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireUser, requireAdmin, type AppUser } from "@/lib/session";
+import { requireUser, requireAdmin, isReviewer, type AppUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { verifyEmail } from "@/lib/millionverifier";
 import { getDelegate, getCompanyById, STAGE_VALUES, type DelegateRow } from "@/lib/data";
 import { canEdit, stageChangeNeedsReview, emailDomainMatches, SECURED_STAGES, NO_ACCESS_MSG } from "@/lib/policy";
 import { logChange, isRateGuarded, RATE_GUARD_MSG } from "@/lib/changes";
 import { companyDisplay } from "@/lib/company";
+import { canonicalizeLinkedinUrl, fullNameFrom, normalizePhone, type FieldWriteResult } from "@/lib/contactFields";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);
@@ -88,107 +89,6 @@ export async function updateStatus(formData: FormData) {
   await logChange(user, entry);
   revalidatePath(`/delegates/${delegateId}`);
   flash(delegateId, "ok", "Status updated", ret, "registration");
-}
-
-export async function submitEmail(formData: FormData) {
-  const user = await requireUser();
-  const delegateId = String(formData.get("delegateId"));
-  const ret = String(formData.get("return") ?? "");
-  const newEmail = String(formData.get("newEmail") || "").trim().toLowerCase();
-  if (!newEmail.includes("@")) flash(delegateId, "warn", "Enter a valid email", ret);
-  const d = await loadContext(delegateId);
-  guard(user, d, ret);
-  const contactId = d.contact?.id as string;
-  const oldEmail = d.contact?.email ?? null;
-  const sb = supabaseAdmin();
-
-  const mv = await verifyEmail(newEmail);
-  const entry = {
-    ...base(d),
-    kind: "email" as const,
-    field: "email",
-    current_value: oldEmail,
-    proposed_value: newEmail,
-    mv_result: mv.result,
-  };
-
-  // Tier B rules: MV must pass AND the domain must match the company's
-  // domain_root (when known) — otherwise it goes to the queue with the reason.
-  const domainRoot: string | null = d.contact?.company?.domain_root ?? null;
-  const domainOk = emailDomainMatches(newEmail, domainRoot);
-
-  if (mv.valid && domainOk) {
-    if (await isRateGuarded(user)) {
-      await logChange(user, entry, "pending");
-      flash(delegateId, "warn", RATE_GUARD_MSG, ret);
-    }
-    // append 'email' to user_managed_fields
-    const managed: string[] = Array.isArray(d.contact?.user_managed_fields)
-      ? d.contact.user_managed_fields
-      : [];
-    if (!managed.includes("email")) managed.push("email");
-    await sb
-      .from("contacts")
-      .update({
-        email: newEmail,
-        email_source: "user_submitted",
-        email_mv_result: mv.result,
-        email_mv_verified_at: new Date().toISOString(),
-        user_managed_fields: managed,
-      })
-      .eq("id", contactId);
-    await logChange(user, entry);
-    revalidatePath(`/delegates/${delegateId}`);
-    flash(delegateId, "ok", "Email verified and updated", ret);
-  } else {
-    await logChange(user, entry, "pending");
-    const why = !mv.valid
-      ? `Email found ${mv.result}.`
-      : `Domain doesn’t match the company (${domainRoot}).`;
-    flash(delegateId, "warn", `${why} Queued for review.`, ret);
-  }
-}
-
-export async function addOtherPhone(formData: FormData) {
-  const user = await requireUser();
-  const delegateId = String(formData.get("delegateId"));
-  const ret = String(formData.get("return") ?? "");
-  const newPhone = String(formData.get("newPhone") || "").trim();
-  if (newPhone.length < 5) flash(delegateId, "warn", "Enter a valid phone", ret);
-  const d = await loadContext(delegateId);
-  guard(user, d, ret);
-  const contactId = d.contact?.id as string;
-  const sb = supabaseAdmin();
-
-  const entry = {
-    ...base(d),
-    kind: "phone" as const,
-    field: "other_phone",
-    current_value: d.contact?.other_phone ?? null,
-    proposed_value: newPhone,
-  };
-  if (await isRateGuarded(user)) {
-    await logChange(user, entry, "pending");
-    flash(delegateId, "warn", RATE_GUARD_MSG, ret);
-  }
-
-  const managed: string[] = Array.isArray(d.contact?.user_managed_fields)
-    ? d.contact.user_managed_fields
-    : [];
-  if (!managed.includes("other_phone")) managed.push("other_phone");
-
-  // additive: never overwrite original phone/mobile
-  await sb
-    .from("contacts")
-    .update({
-      other_phone: newPhone,
-      other_phone_source: "user_managed",
-      user_managed_fields: managed,
-    })
-    .eq("id", contactId);
-  await logChange(user, entry);
-  revalidatePath(`/delegates/${delegateId}`);
-  flash(delegateId, "ok", "Added to Other phone", ret);
 }
 
 // Admin-only hard delete of the role row. Typed confirmation ("REMOVE") is
@@ -420,3 +320,223 @@ export async function flagRole(formData: FormData) {
   if (err) flash(delegateId, "warn", `Couldn’t submit: ${err}`, ret);
   flash(delegateId, "ok", "Role change submitted for review", ret);
 }
+
+// ─── Inline field editors (Contact details card) ─────────────────────────────
+// Result-returning actions for ContactDetails.tsx. Every path: canEdit scope
+// gate → tier rule → rate guard → write → logChange. Identical to speakers-app.
+
+async function fieldContext(delegateId: string): Promise<{ user: AppUser; d: DelegateRow } | { denied: FieldWriteResult }> {
+  const user = await requireUser();
+  const d = await loadContext(delegateId);
+  if (!canEdit(user, { eventId: d.event_id, edition: d.event_edition })) {
+    return { denied: { ok: false, message: NO_ACCESS_MSG } };
+  }
+  return { user, d };
+}
+
+function managedWith(d: DelegateRow, field: string): string[] {
+  const managed: string[] = Array.isArray(d.contact?.user_managed_fields) ? [...d.contact.user_managed_fields] : [];
+  if (!managed.includes(field)) managed.push(field);
+  return managed;
+}
+
+// Work email — Tier B: MV valid AND domain matches the company → apply + log;
+// otherwise queued with the reason. (Was the "Found a new email?" form.)
+export async function updateWorkEmail(delegateId: string, email: string): Promise<FieldWriteResult> {
+  const newEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) return { ok: false, message: "Enter a valid email address." };
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const contactId = d.contact?.id as string;
+  const oldEmail = d.contact?.email ?? null;
+  if (oldEmail && oldEmail.toLowerCase() === newEmail) return { ok: true, message: "Email unchanged", value: oldEmail };
+
+  const mv = await verifyEmail(newEmail);
+  const entry = { ...base(d), kind: "email" as const, field: "email", current_value: oldEmail, proposed_value: newEmail, mv_result: mv.result };
+  const domainRoot: string | null = d.contact?.company?.domain_root ?? null;
+  const domainOk = emailDomainMatches(newEmail, domainRoot);
+
+  if (!(mv.valid && domainOk)) {
+    const err = await logChange(user, entry, "pending");
+    if (err) return { ok: false, message: `Couldn’t queue the change: ${err}` };
+    const why = !mv.valid ? `Email verified as ${mv.result}.` : `Domain doesn’t match the company (${domainRoot}).`;
+    return { ok: true, queued: true, message: `${why} Sent for review.` };
+  }
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({
+      email: newEmail,
+      email_source: "user_submitted",
+      email_mv_result: mv.result,
+      email_mv_verified_at: new Date().toISOString(),
+      user_managed_fields: managedWith(d, "email"),
+    })
+    .eq("id", contactId);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  return { ok: true, message: "Work email verified and updated", value: newEmail };
+}
+
+// Name — Tier C identity change: QUEUED (kind 'role', field 'name'). Admin /
+// reviewer apply immediately (they could approve it anyway) + log.
+export async function updateName(delegateId: string, first: string, last: string): Promise<FieldWriteResult> {
+  const f = first.trim().replace(/\s+/g, " ");
+  const l = last.trim().replace(/\s+/g, " ");
+  const full = fullNameFrom(f, l);
+  if (full.length < 2) return { ok: false, message: "Enter the person’s name." };
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const current = d.contact?.full_name_clean ?? null;
+  if (current === full && (d.contact?.first_name_clean ?? "") === f && (d.contact?.last_name_clean ?? "") === l) {
+    return { ok: true, message: "Name unchanged", value: full };
+  }
+  const entry = { ...base(d), kind: "role" as const, field: "name", current_value: current, proposed_value: full };
+  if (!isReviewer(user) || (await isRateGuarded(user))) {
+    const err = await logChange(user, entry, "pending");
+    if (err) return { ok: false, message: `Couldn’t queue the change: ${err}` };
+    return { ok: true, queued: true, message: "Name change sent for review" };
+  }
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({
+      full_name_clean: full,
+      first_name_clean: f || null,
+      last_name_clean: l || null,
+      user_managed_fields: managedWith(d, "full_name_clean"),
+    })
+    .eq("id", d.contact?.id);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  return { ok: true, message: "Name updated", value: full };
+}
+
+// Job title — Tier A: auto-apply + log (kind 'role', field 'job_title').
+export async function updateJobTitle(delegateId: string, title: string): Promise<FieldWriteResult> {
+  const t = title.trim().replace(/\s+/g, " ");
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const current = d.contact?.job_title ?? null;
+  if ((current ?? "") === t) return { ok: true, message: "Job title unchanged", value: current };
+  const entry = { ...base(d), kind: "role" as const, field: "job_title", current_value: current, proposed_value: t || null };
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const { error } = await supabaseAdmin()
+    .from("contacts")
+    .update({ job_title: t || null, user_managed_fields: managedWith(d, "job_title") })
+    .eq("id", d.contact?.id);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  return { ok: true, message: "Job title updated", value: t || null };
+}
+
+export type PhoneField = "mobile" | "office_phone" | "other_phone";
+const PHONE_FIELDS: PhoneField[] = ["mobile", "office_phone", "other_phone"];
+
+// Phone / Mobile correction — Tier A: auto-apply + log (kind 'phone'). The
+// previous number is kept: it moves to other_phone when that is empty, else it
+// stays on the change-log row (current_value). Other phone: plain replace.
+// `restoreOther` (Undo path) puts other_phone back to what it was before the
+// move so an undo leaves no duplicate behind.
+export async function updatePhone(
+  delegateId: string,
+  field: PhoneField,
+  value: string,
+  restoreOther?: { other_phone: string | null }
+): Promise<FieldWriteResult> {
+  if (!PHONE_FIELDS.includes(field)) return { ok: false, message: "Unknown phone field." };
+  const v = normalizePhone(value);
+  if (v && v.replace(/\D/g, "").length < 5) return { ok: false, message: "Enter a valid phone number." };
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const c = d.contact ?? {};
+  const current: string | null = c[field] ?? null;
+  if ((current ?? "") === v) return { ok: true, message: "Number unchanged", value: current, other_phone: c.other_phone ?? null };
+  const entry = { ...base(d), kind: "phone" as const, field, current_value: current, proposed_value: v || null };
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const patch: Record<string, unknown> = { [field]: v || null };
+  let otherAfter: string | null = c.other_phone ?? null;
+  if (field !== "other_phone") {
+    if (restoreOther) {
+      otherAfter = restoreOther.other_phone;
+      patch.other_phone = otherAfter;
+    } else if (current && !c.other_phone && v) {
+      otherAfter = current;
+      patch.other_phone = current;
+      patch.other_phone_source = "user_managed";
+    }
+  } else {
+    otherAfter = v || null;
+    patch.other_phone_source = "user_managed";
+  }
+  const managed = managedWith(d, field);
+  if (patch.other_phone !== undefined && !managed.includes("other_phone")) managed.push("other_phone");
+  patch.user_managed_fields = managed;
+  const { error } = await supabaseAdmin().from("contacts").update(patch).eq("id", c.id);
+  if (error) return { ok: false, message: error.message };
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  const label = field === "mobile" ? "Mobile" : field === "office_phone" ? "Phone" : "Other phone";
+  return { ok: true, message: `${label} updated`, value: v || null, other_phone: otherAfter };
+}
+
+// LinkedIn — canonicalised; auto-apply (kind 'other', field 'linkedin_url') when
+// the slug is valid AND no other contact carries it; a collision is queued for
+// review (the admin resolves the likely duplicate).
+export async function updateLinkedin(delegateId: string, url: string): Promise<FieldWriteResult> {
+  const canonical = canonicalizeLinkedinUrl(url);
+  if (!canonical) return { ok: false, message: "Enter a LinkedIn profile URL (linkedin.com/in/…)." };
+  const ctx = await fieldContext(delegateId);
+  if ("denied" in ctx) return ctx.denied;
+  const { user, d } = ctx;
+  const current: string | null = d.contact?.linkedin_url_canonical ?? null;
+  if (current === canonical) return { ok: true, message: "LinkedIn unchanged", value: current };
+  const entry = { ...base(d), kind: "other" as const, field: "linkedin_url", current_value: current, proposed_value: canonical };
+  const sb = supabaseAdmin();
+  const { data: clash } = await sb
+    .from("contacts")
+    .select("id, full_name_clean")
+    .eq("linkedin_url_canonical", canonical)
+    .neq("id", d.contact?.id)
+    .maybeSingle();
+  if (clash) {
+    const err = await logChange(user, entry, "pending");
+    if (err) return { ok: false, message: `Couldn’t queue the change: ${err}` };
+    return { ok: true, queued: true, message: `This LinkedIn is already on ${clash.full_name_clean ?? "another contact"} — sent for review` };
+  }
+  if (await isRateGuarded(user)) {
+    await logChange(user, entry, "pending");
+    return { ok: true, queued: true, message: RATE_GUARD_MSG };
+  }
+  const { error } = await sb
+    .from("contacts")
+    .update({ linkedin_url_canonical: canonical, user_managed_fields: managedWith(d, "linkedin_url_canonical") })
+    .eq("id", d.contact?.id);
+  if (error) {
+    if ((error as { code?: string }).code === "23505") {
+      await logChange(user, entry, "pending");
+      return { ok: true, queued: true, message: "This LinkedIn is already on another contact — sent for review" };
+    }
+    return { ok: false, message: error.message };
+  }
+  await logChange(user, entry);
+  revalidatePath(`/delegates/${delegateId}`);
+  return { ok: true, message: "LinkedIn updated", value: canonical };
+}
+
+// Admin-only hard delete of the role row. Typed confirmation ("REMOVE") is

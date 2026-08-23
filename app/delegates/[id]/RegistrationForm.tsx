@@ -1,141 +1,139 @@
 "use client";
 
+import { useRef, useState, type ReactNode } from "react";
 import type { DelegateRow } from "@/lib/data";
 import { updateRegistration } from "./actions";
 import { setDirty, useDirtyGuard } from "../../dirty";
 
-function Check({
-  name,
-  label,
-  checked,
-}: {
-  name: string;
-  label: string;
-  checked?: boolean | null;
-}) {
+function Check({ name, label, checked }: { name: string; label: string; checked?: boolean | null }) {
   return (
-    <label
-      style={{
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        fontSize: 14,
-        color: "var(--text)",
-        margin: "0 0 10px",
-      }}
-    >
-      <input
-        type="checkbox"
-        name={name}
-        defaultChecked={!!checked}
-        style={{ width: "auto" }}
-      />
+    <label>
+      <input type="checkbox" name={name} defaultChecked={!!checked} />
       {label}
     </label>
   );
 }
 
 function Field({
-  name,
-  label,
-  value,
-  type = "text",
-  placeholder,
+  name, label, value, type = "text", placeholder, help, span2,
 }: {
-  name: string;
-  label: string;
-  value?: string | number | null;
-  type?: string;
-  placeholder?: string;
+  name: string; label: string; value?: string | number | null; type?: string; placeholder?: string; help?: ReactNode; span2?: boolean;
 }) {
+  const id = `reg-${name}`;
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label>{label}</label>
-      <input name={name} type={type} defaultValue={value ?? ""} placeholder={placeholder} />
+    <div className={`field${span2 ? " span-2" : ""}`}>
+      <label htmlFor={id}>{label}</label>
+      <input id={id} className="input" name={name} type={type} defaultValue={value ?? ""} placeholder={placeholder} step={type === "number" ? "0.01" : undefined} />
+      {help && <p className="help">{help}</p>}
     </div>
   );
 }
 
-function Area({
-  name,
-  label,
-  value,
-}: {
-  name: string;
-  label: string;
-  value?: string | null;
-}) {
+function Area({ name, label, value, placeholder }: { name: string; label: string; value?: string | null; placeholder?: string }) {
+  const id = `reg-${name}`;
   return (
-    <div style={{ marginBottom: 12 }}>
-      <label>{label}</label>
-      <textarea name={name} defaultValue={value ?? ""} rows={2} style={{ width: "100%" }} />
+    <div className="field span-2">
+      <label htmlFor={id}>{label}</label>
+      <textarea id={id} className="input" name={name} defaultValue={value ?? ""} rows={2} placeholder={placeholder} />
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function Fieldset({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   return (
-    <p
-      className="muted"
-      style={{
-        fontSize: 12,
-        textTransform: "uppercase",
-        letterSpacing: 0.4,
-        fontWeight: 700,
-        margin: "18px 0 10px",
-      }}
-    >
+    <section className="fieldset" aria-label={title}>
+      <div className="fieldset-head">
+        <p className="section-title">{title}</p>
+        {sub && <p className="section-sub">{sub}</p>}
+      </div>
       {children}
-    </p>
+    </section>
   );
 }
 
-// Registration editor. Uncontrolled fields (server action form); an unsaved-
-// changes guard (beforeunload + in-app tab switch via app/dirty.ts) arms on the
-// first edit and disarms on submit.
+function fmtStamp(iso?: string | null) {
+  if (!iso) return null;
+  const t = new Date(iso);
+  return isNaN(t.getTime()) ? null : t.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+// Registration editor: Registration · Payment & invoice · Notes fieldsets on a
+// .form-grid. Uncontrolled fields (server action form); the unsaved-changes
+// guard (beforeunload + in-app tab switch via app/dirty.ts) arms on the first
+// edit, shows the sticky "Save changes" bar, and disarms on submit / discard.
 export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: string }) {
   useDirtyGuard();
+  const formRef = useRef<HTMLFormElement>(null);
+  const [dirty, setLocalDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const markDirty = () => { setSaving(false); if (!dirty) { setLocalDirty(true); setDirty(true); } };
+  const discard = () => { formRef.current?.reset(); setLocalDirty(false); setDirty(false); };
+
   return (
     <form
+      ref={formRef}
       action={updateRegistration}
-      onChange={() => setDirty(true)}
-      onSubmit={() => setDirty(false)}
+      onChange={markDirty}
+      onSubmit={() => { setSaving(true); setDirty(false); }}
+      className="fieldset-stack"
     >
       <input type="hidden" name="delegateId" value={d.id} />
       <input type="hidden" name="return" value={ret} />
 
-      <div className="grid2">
-        <div>
-          <SectionLabel>Registration</SectionLabel>
+      <Fieldset title="Registration">
+        <div className="form-grid">
           <Field name="ticket_type" label="Ticket type" value={d.ticket_type} placeholder="e.g. Standard / VIP / Speaker pass" />
           <Field name="delegate_type" label="Delegate type" value={d.delegate_type} placeholder="e.g. Banker / Regulator / Partner" />
           <Field name="registration_date" label="Registration date" type="date" value={d.registration_date} />
-          <Field name="badge_name" label="Badge name" value={d.badge_name} placeholder="Name as printed on badge" />
+          <Field name="badge_name" label="Badge name" value={d.badge_name} placeholder="Name as printed on the badge" />
           <Field name="seating_assignment" label="Seating assignment" value={d.seating_assignment} placeholder="e.g. Table 4" />
-
-          <SectionLabel>On-site</SectionLabel>
           <Area name="dietary_requirements" label="Dietary requirements" value={d.dietary_requirements} />
           <Area name="special_access" label="Special access / accessibility" value={d.special_access} />
         </div>
+      </Fieldset>
 
-        <div>
-          <SectionLabel>Invoicing &amp; payment</SectionLabel>
-          <Check name="invoice_sent" label="Invoice sent?" checked={d.invoice_sent} />
-          <Check name="payment_received" label="Payment received?" checked={d.payment_received} />
-          <Field name="payment_amount" label="Payment amount (USD)" type="number" value={d.payment_amount} placeholder="0.00" />
-
-          <SectionLabel>Complimentary</SectionLabel>
-          <Check name="complimentary" label="Complimentary delegate?" checked={d.complimentary} />
-          <Field name="complimentary_reason" label="Reason" value={d.complimentary_reason} placeholder="e.g. Speaker guest / VIP invite" />
-
-          <SectionLabel>Notes</SectionLabel>
-          <Area name="notes" label="Internal notes" value={d.notes} />
+      <Fieldset title="Payment & invoice">
+        <div className="form-grid">
+          <div className="field">
+            <span className="help" style={{ fontSize: "var(--fs-sm)" }}>Status</span>
+            <div className="check-row">
+              <Check name="invoice_sent" label="Invoice sent" checked={d.invoice_sent} />
+              <Check name="payment_received" label="Payment received" checked={d.payment_received} />
+              <Check name="complimentary" label="Complimentary delegate" checked={d.complimentary} />
+            </div>
+            {(d.invoice_sent_at || d.payment_received_at) && (
+              <p className="help">
+                {d.invoice_sent_at ? `Invoice sent ${fmtStamp(d.invoice_sent_at)}` : ""}
+                {d.invoice_sent_at && d.payment_received_at ? " · " : ""}
+                {d.payment_received_at ? `Paid ${fmtStamp(d.payment_received_at)}` : ""}
+              </p>
+            )}
+          </div>
+          <div className="fieldset-stack">
+            <Field name="payment_amount" label="Payment amount (USD)" type="number" value={d.payment_amount} placeholder="0.00" />
+            <Field name="complimentary_reason" label="Complimentary reason" value={d.complimentary_reason} placeholder="e.g. Speaker guest / VIP invite" />
+          </div>
         </div>
-      </div>
+      </Fieldset>
 
-      <button className="btn btn-primary" type="submit" style={{ marginTop: 8 }}>
-        Save registration
-      </button>
+      <Fieldset title="Notes">
+        <div className="form-grid">
+          <Area name="notes" label="Internal notes" value={d.notes} placeholder="Anything the team should know on the day" />
+        </div>
+      </Fieldset>
+
+      {dirty && (
+        <div className="save-bar" role="region" aria-label="Unsaved changes">
+          <span className="save-bar-msg">Unsaved changes</span>
+          <div className="form-actions">
+            <button className="btn btn-sm" type="button" onClick={discard} disabled={saving}>Discard</button>
+            <button className="btn btn-primary btn-sm" type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
