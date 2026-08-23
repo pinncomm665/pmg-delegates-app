@@ -7,7 +7,7 @@ function Para({ label, text }: { label: string; text?: string | null }) {
   if (!text) return null;
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--muted)" }}>{label}</div>
+      <div className="section-title" style={{ fontSize: 12 }}>{label}</div>
       <p style={{ fontSize: 13.5, margin: "3px 0 0", lineHeight: 1.5 }}>{text}</p>
     </div>
   );
@@ -17,7 +17,7 @@ function Points({ points }: { points?: string[] }) {
   if (!points?.length) return null;
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--muted)" }}>Talking points</div>
+      <div className="section-title" style={{ fontSize: 12 }}>Talking points</div>
       <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
         {points.map((p, i) => <li key={i} style={{ fontSize: 13.5, marginBottom: 3 }}>{p}</li>)}
       </ul>
@@ -29,7 +29,7 @@ function Cautions({ rows }: { rows?: { caution: string; handling: string }[] }) 
   if (!rows?.length) return null;
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--muted)", marginBottom: 4 }}>Cautions</div>
+      <div className="section-title" style={{ fontSize: 12, marginBottom: 4 }}>Cautions</div>
       <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
@@ -56,7 +56,7 @@ function Sources({ sources }: { sources?: { title: string | null; url: string }[
   if (!sources?.length) return null;
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3, color: "var(--muted)" }}>Sources</div>
+      <div className="section-title" style={{ fontSize: 12 }}>Sources</div>
       <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
         {sources.map((s, i) => (
           <li key={i} style={{ fontSize: 12.5 }}><a href={s.url} target="_blank" rel="noreferrer">{s.title || s.url}</a></li>
@@ -74,15 +74,18 @@ export default function BriefView({ profile, delegateId, ret }: { profile: Conta
   return (
     <div>
       <BriefPoller delegateId={delegateId} status={status} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-        <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-          Attend-value research — why invite them to this summit.
-          {profile?.generated_at ? ` · updated ${new Date(profile.generated_at).toLocaleDateString()}` : ""}
-        </p>
+      <div className="section-head">
+        <div>
+          <h3 className="section-title">Background notes</h3>
+          <p className="section-sub">
+            Attend-value research — why invite them to this summit.
+            {profile?.generated_at ? ` · updated ${new Date(profile.generated_at).toLocaleDateString()}` : ""}
+          </p>
+        </div>
         <form action={generateBrief}>
           <input type="hidden" name="delegateId" value={delegateId} />
           <input type="hidden" name="return" value={ret} />
-          <button className="btn" type="submit" style={{ padding: "6px 10px" }}>{b ? "↻ Regenerate" : "Generate"}</button>
+          <button className="btn btn-sm" type="submit">{b ? "↻ Regenerate" : "Generate"}</button>
         </form>
       </div>
 
