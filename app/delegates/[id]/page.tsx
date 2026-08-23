@@ -17,6 +17,8 @@ import BriefView from "./BriefView";
 import RemoveDelegateDialog from "./RemoveDelegateDialog";
 import ActivityList from "../../ActivityList";
 import { getContactActivity } from "@/lib/changes";
+import { getContactNoteAttachments } from "@/lib/notes";
+import LogActivity from "./LogActivity";
 import { canEdit, NO_ACCESS_MSG } from "@/lib/policy";
 
 export const dynamic = "force-dynamic";
@@ -42,10 +44,11 @@ export default async function DelegateDetail({
   const ret = searchParams.return ?? "";
   const backHref = ret ? `/delegates?${ret}` : "/delegates";
   // Independent reads → one round trip.
-  const [profile, activity, summary] = await Promise.all([
+  const [profile, activity, summary, noteAttachments] = await Promise.all([
     c.id ? getContactProfile(c.id, "delegate", d.event_id) : Promise.resolve(null),
     c.id ? getContactActivity(c.id) : Promise.resolve([]),
     c.id ? getContactSummary(c.id) : Promise.resolve(null),
+    c.id ? getContactNoteAttachments(c.id) : Promise.resolve([]),
   ]);
   const editable = canEdit(user, { eventId: d.event_id, edition: d.event_edition });
   const companyName = companyDisplay(c.company?.name ?? c.company_name_submitted) ?? null;
@@ -99,7 +102,10 @@ export default async function DelegateDetail({
               </p>
               </div>
             </div>
-            <span className={stageBadgeClass(d.stage)}>{stageLabel(d.stage)}</span>
+            <div className="sp-head-actions">
+              {c.id && <LogActivity delegateId={d.id} contactId={c.id} ret={ret} disabled={!editable} />}
+              <span className={stageBadgeClass(d.stage)}>{stageLabel(d.stage)}</span>
+            </div>
           </div>
 
           {c.id && <AISummary contactId={c.id} initial={summary} />}
@@ -151,7 +157,7 @@ export default async function DelegateDetail({
             }
             history={
               c.id ? (
-                <ActivityTimeline contactId={c.id} initial={summary} />
+                <ActivityTimeline contactId={c.id} initial={summary} noteAttachments={noteAttachments} />
               ) : (
                 <p className="muted" style={{ fontSize: 13 }}>No activity recorded yet.</p>
               )
@@ -189,7 +195,7 @@ export default async function DelegateDetail({
             background={<BriefView profile={profile} delegateId={d.id} ret={ret} />}
             activity={
               <div style={{ maxWidth: 760 }}>
-                <p className="section-title">Activity</p>
+                <p className="section-title">Logs</p>
                 <p className="section-sub" style={{ marginBottom: 12 }}>
                   Every change made to this contact through the team apps — who, when, what. Pending rows are waiting in the review queue.
                 </p>
