@@ -1,0 +1,31 @@
+// Shared shape for the per-contact AI summary (pmg-agent table
+// public.contact_summaries — see AI_SUMMARY_SPEC). Used by the server read in
+// lib/data.ts, the status route and the client card.
+export type ContactSummaryStatus = "pending" | "generating" | "ready" | "error" | "skipped";
+
+export type ContactSummaryFacts = {
+  last_contact_at?: string | null;
+  last_contact_direction?: "inbound" | "outbound" | null;
+  last_contact_by?: string | null;
+  last_subject?: string | null;
+  last_channel?: "email" | "instantly" | "call" | "meeting" | null;
+  email_count?: number | null;
+  inbound_count?: number | null;
+  outbound_count?: number | null;
+  instantly_campaigns?: string[] | null;
+  next_step?: string | null;
+  stage?: string | null;
+  role?: string | null;
+  edition?: string | null;
+  cautions?: string[] | null;
+};
+
+export type ContactSummary = {
+  contact_id: string;
+  summary_md: string | null;
+  facts: ContactSummaryFacts;
+  status: ContactSummaryStatus;
+  error: string | null;
+  generated_at: string | null;
+  updated_at: string | null;
+};

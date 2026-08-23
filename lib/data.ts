@@ -539,3 +539,31 @@ export function stageBadgeClass(stage: string | null): string {
   if (["cancelled", "declined", "no_show"].includes(s)) return "badge";
   return "badge badge-warn";
 }
+
+// Per-contact AI summary (pmg-agent table contact_summaries). Degrades to null
+// when the table does not exist yet or the row is missing — the card handles
+// both; never throws into the page render.
+export type { ContactSummary } from "./contactSummary";
+export async function getContactSummary(contactId: string): Promise<import("./contactSummary").ContactSummary | null> {
+  try {
+    const sb = supabaseAdmin();
+    const { data, error } = await sb
+      .from("contact_summaries")
+      .select("contact_id, summary_md, facts, status, error, generated_at, updated_at")
+      .eq("contact_id", contactId)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as any;
+    return {
+      contact_id: row.contact_id,
+      summary_md: row.summary_md ?? null,
+      facts: (row.facts && typeof row.facts === "object" ? row.facts : {}) as any,
+      status: row.status ?? "ready",
+      error: row.error ?? null,
+      generated_at: row.generated_at ?? null,
+      updated_at: row.updated_at ?? null,
+    };
+  } catch {
+    return null;
+  }
+}

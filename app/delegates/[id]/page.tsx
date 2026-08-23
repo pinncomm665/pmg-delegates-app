@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireUser, isAdmin, isReviewer } from "@/lib/session";
-import { getDelegate, getEnrolments, getContactProfile, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
+import { getDelegate, getEnrolments, getContactProfile, getContactSummary, stageBadgeClass, stageLabel, STAGES } from "@/lib/data";
+import AISummary from "./AISummary";
 import EmailHistory from "./EmailHistory";
 import ProfileTabs from "./ProfileTabs";
 import { companyDisplay } from "@/lib/company";
@@ -42,10 +43,11 @@ export default async function DelegateDetail({
   const ret = searchParams.return ?? "";
   const backHref = ret ? `/delegates?${ret}` : "/delegates";
   // Independent reads → one round trip.
-  const [enrolments, profile, activity] = await Promise.all([
+  const [enrolments, profile, activity, summary] = await Promise.all([
     c.id ? getEnrolments(c.id) : Promise.resolve([]),
     c.id ? getContactProfile(c.id, "delegate", d.event_id) : Promise.resolve(null),
     c.id ? getContactActivity(c.id) : Promise.resolve([]),
+    c.id ? getContactSummary(c.id) : Promise.resolve(null),
   ]);
   const editable = canEdit(user, { eventId: d.event_id, edition: d.event_edition });
   const companyName = companyDisplay(c.company?.name ?? c.company_name_submitted) ?? null;
@@ -101,6 +103,8 @@ export default async function DelegateDetail({
             </div>
             <span className={stageBadgeClass(d.stage)}>{stageLabel(d.stage)}</span>
           </div>
+
+          {c.id && <AISummary contactId={c.id} initial={summary} />}
 
           <ProfileTabs
             contact={

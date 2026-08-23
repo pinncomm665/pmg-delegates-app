@@ -599,3 +599,36 @@ select.input { padding-right: 32px; }
   .cd-edit svg { margin: 0; }
   .cd-editor .form-actions .btn { flex: 1; }
 }
+
+/* ── AI summary card (detail page, between header and tabs) ────────────────── */
+.ai-sum {
+  display: flex; flex-direction: column; gap: var(--gap-2);
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.ai-sum-head { display: flex; align-items: center; justify-content: space-between; gap: var(--gap-2); flex-wrap: wrap; }
+.ai-sum-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ai-sum-icon { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+.ai-sum-state { gap: 6px; }
+.ai-sum-state .btn-spin { width: 10px; height: 10px; border-width: 1.5px; }
+.ai-sum-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ai-sum-updated { font-size: var(--fs-sm); margin-right: 4px; white-space: nowrap; }
+.ai-sum-toggle { display: none; }
+.ai-sum-body { display: flex; flex-direction: column; gap: var(--gap-2); min-width: 0; }
+.ai-sum-text { max-width: 78ch; }
+.ai-sum-text p { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text); }
+.ai-sum-text p + p { margin-top: 10px; }
+.ai-sum-text strong { font-weight: 600; }
+.ai-sum-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-sum-facts .chip { white-space: normal; line-height: 1.5; padding: 3px 10px; font-weight: 500; font-size: var(--fs-sm); }
+.ai-sum-k { font-weight: 600; margin-right: 2px; }
+.ai-sum-k::after { content: ":"; }
+.ai-sum-error { color: var(--danger); }
+.ai-sum-skel { display: flex; flex-direction: column; gap: 8px; max-width: 78ch; }
+.ai-sum-skel-line { display: block; height: 12px; width: 100%; }
+.ai-sum-skel-line.short { width: 62%; }
+@media (max-width: 760px) {
+  .ai-sum-toggle { display: inline-flex; }
+  .ai-sum-updated { display: none; }
+  .ai-sum.is-collapsed .ai-sum-body { display: none; }
+  .ai-sum.is-collapsed .ai-sum-head { margin: 0; }
+}
