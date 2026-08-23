@@ -5,6 +5,8 @@ import { useDialog } from "../useDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Avatar from "../Avatar";
+import { useToast, looksLikeSessionExpired } from "../Toast";
+import { selectAllMatching } from "./actions";
 
 export type Row = {
   id: string;
@@ -17,6 +19,9 @@ export type Row = {
   stage: string;          // raw stage value (editable inline)
   stageLabel: string;
   stageClass: string;
+  email?: string | null;
+  phone?: string | null;
+  linkedin?: string | null;
 };
 type Campaign = { id: string; name: string; active: boolean };
 type SortKey = "name" | "job_title" | "company" | "edition" | "stage";
@@ -24,6 +29,7 @@ type Dir = "asc" | "desc";
 
 const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
+  { value: "shortlisted", label: "Shortlisted" },
   { value: "invited", label: "Invited" },
   { value: "applied", label: "Applied" },
   { value: "registered", label: "Registered" },
@@ -33,47 +39,88 @@ const STAGES: { value: string; label: string }[] = [
   { value: "declined", label: "Declined" },
   { value: "no_show", label: "No Show" },
 ];
+const stageLabelOf = (v: string) => STAGES.find((s) => s.value === v)?.label ?? v;
 // Tone of the inline stage select (colours come from globals.css .stage-select)
 const STAGE_TONE: Record<string, "is-positive" | "is-negative"> = {
   registered: "is-positive", confirmed: "is-positive", attended: "is-positive",
   cancelled: "is-negative", declined: "is-negative", no_show: "is-negative",
 };
 
+// Optional columns (Email · Phone · LinkedIn) — persisted in localStorage.
+type OptCol = "email" | "phone" | "linkedin";
+const OPT_COLS: { k: OptCol; label: string }[] = [
+  { k: "email", label: "Email" },
+  { k: "phone", label: "Phone" },
+  { k: "linkedin", label: "LinkedIn" },
+];
+const COLS_KEY = "pmg-delegates-cols";
+const PAGE_SIZES = [50, 100, 250];
+
+function linkedinSlug(url: string): string {
+  try {
+    const u = new URL(url.startsWith("http") ? url : `https://${url}`);
+    return u.pathname.replace(/\/+$/, "").replace(/^\/+/, "") || u.hostname;
+  } catch { return url; }
+}
+
 export default function DelegatesList({
   rows,
   filterQs,
+  hasFilters,
   page,
   pageCount,
+  pageSize,
   total,
   sort,
   dir,
 }: {
   rows: Row[];
   filterQs: string;
+  hasFilters: boolean;
   page: number;
   pageCount: number;
+  pageSize: number;
   total: number;
   sort: SortKey;
   dir: Dir;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [sel, setSel] = useState<Set<string>>(new Set());
+  const [selAllNote, setSelAllNote] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
   const [modal, setModal] = useState(false);
   const [data, setData] = useState<Row[]>(rows);
   const [saving, setSaving] = useState<string | null>(null);
+  const [cols, setCols] = useState<Set<OptCol>>(new Set());
   // rows change when the server sends a new page → reset local edits + selection.
-  useEffect(() => { setData(rows); setSel(new Set()); }, [rows]);
+  useEffect(() => { setData(rows); setSel(new Set()); setSelAllNote(null); }, [rows]);
+  // Optional columns: restore from localStorage once.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(COLS_KEY);
+      if (raw) setCols(new Set((JSON.parse(raw) as string[]).filter((k): k is OptCol => ["email", "phone", "linkedin"].includes(k))));
+    } catch {}
+  }, []);
+  const toggleCol = (k: OptCol) =>
+    setCols((c) => {
+      const n = new Set(c); n.has(k) ? n.delete(k) : n.add(k);
+      try { window.localStorage.setItem(COLS_KEY, JSON.stringify([...n])); } catch {}
+      return n;
+    });
 
   // Sorting + paging are server-side: they navigate with updated query params.
-  const buildUrl = (over: { sort?: SortKey; dir?: Dir; page?: number }) => {
+  const buildUrl = (over: { sort?: SortKey; dir?: Dir; page?: number; pageSize?: number }) => {
     const p = new URLSearchParams(filterQs);
     p.set("sort", over.sort ?? sort);
     p.set("dir", over.dir ?? dir);
     p.set("page", String(over.page ?? 1));
+    const ps = over.pageSize ?? pageSize;
+    if (ps !== 100) p.set("pageSize", String(ps));
     return `/delegates?${p.toString()}`;
   };
-  const go = (over: { sort?: SortKey; dir?: Dir; page?: number }) =>
+  const go = (over: { sort?: SortKey; dir?: Dir; page?: number; pageSize?: number }) =>
     startTransition(() => router.push(buildUrl(over)));
 
   const clickSort = (key: SortKey) =>
@@ -84,6 +131,7 @@ export default function DelegatesList({
   const retFull = (() => {
     const p = new URLSearchParams(filterQs);
     p.set("page", String(page)); p.set("sort", sort); p.set("dir", dir);
+    if (pageSize !== 100) p.set("pageSize", String(pageSize));
     return p.toString();
   })();
   const detailHref = (id: string) => `/delegates/${id}?return=${encodeURIComponent(retFull)}`;
@@ -91,20 +139,71 @@ export default function DelegatesList({
   const toggle = (id: string) =>
     setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const allOn = data.length > 0 && data.every((r) => sel.has(r.id));
-  const toggleAll = () => setSel(allOn ? new Set() : new Set(data.map((r) => r.id)));
+  const toggleAll = () => { setSelAllNote(null); setSel(allOn ? new Set() : new Set(data.map((r) => r.id))); };
+
+  // "Select all N matching" — every id in the current filter set (server action, capped).
+  const selectAll = async () => {
+    setSelecting(true);
+    try {
+      const r = await selectAllMatching(filterQs);
+      setSel(new Set(r.ids));
+      setSelAllNote(r.capped ? `Selected the first ${r.cap.toLocaleString()} of ${total.toLocaleString()} (cap)` : `All ${r.ids.length.toLocaleString()} matching selected`);
+    } catch {
+      toast.push({ message: "Couldn’t select all — try again.", tone: "warn" });
+    } finally { setSelecting(false); }
+  };
+
+  // Inline stage change → POST; toast with Undo (which calls the same endpoint
+  // with the previous stage). Queued/denied responses revert the optimistic
+  // value and explain why. HTML/redirect responses mean the session expired.
+  const postStage = async (id: string, stage: string): Promise<{ ok: boolean; queued?: boolean; message?: string; expired?: boolean }> => {
+    const r = await fetch("/api/delegates/status", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ delegate_id: id, stage }),
+    });
+    if (looksLikeSessionExpired(r)) return { ok: false, expired: true };
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, message: d.error ?? `HTTP ${r.status}` };
+    return { ok: true, queued: !!d.queued, message: d.message };
+  };
 
   const changeStage = async (id: string, stage: string) => {
-    const prev = data.find((r) => r.id === id)?.stage;
+    const row = data.find((r) => r.id === id);
+    const prev = row?.stage;
     setData((d) => d.map((r) => (r.id === id ? { ...r, stage } : r)));
     setSaving(id);
+    const revert = () => { if (prev) setData((d) => d.map((x) => (x.id === id ? { ...x, stage: prev } : x))); };
     try {
-      const r = await fetch("/api/delegates/status", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ delegate_id: id, stage }),
-      });
-      if (!r.ok && prev) setData((d) => d.map((x) => (x.id === id ? { ...x, stage: prev } : x)));
+      const res = await postStage(id, stage);
+      if (res.expired) {
+        revert();
+        toast.push({ message: "Session expired — sign in again", tone: "warn", link: { label: "Sign in", href: "/login" } });
+      } else if (!res.ok) {
+        revert();
+        toast.push({ message: res.message ?? "Couldn’t update the stage", tone: "warn" });
+      } else if (res.queued) {
+        revert();
+        toast.push({ message: res.message ?? "Held for review", tone: "warn" });
+      } else {
+        toast.push({
+          message: `Moved ${row?.name ?? "delegate"} to ${stageLabelOf(stage)}`,
+          action: prev ? {
+            label: "Undo",
+            onClick: async () => {
+              setData((d) => d.map((x) => (x.id === id ? { ...x, stage: prev } : x)));
+              const u = await postStage(id, prev);
+              if (u.expired) toast.push({ message: "Session expired — sign in again", tone: "warn", link: { label: "Sign in", href: "/login" } });
+              else if (!u.ok || u.queued) {
+                setData((d) => d.map((x) => (x.id === id ? { ...x, stage } : x)));
+                toast.push({ message: u.message ?? "Couldn’t undo", tone: "warn" });
+              } else toast.push({ message: `Restored ${row?.name ?? "delegate"} to ${stageLabelOf(prev)}` });
+            },
+          } : undefined,
+        });
+      }
     } catch {
-      if (prev) setData((d) => d.map((x) => (x.id === id ? { ...x, stage: prev } : x)));
+      revert();
+      toast.push({ message: "Network error — stage not saved", tone: "warn" });
     } finally { setSaving(null); }
   };
 
@@ -132,12 +231,30 @@ export default function DelegatesList({
   };
 
   const Pager = () => (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 12, opacity: pending ? 0.5 : 1 }}>
+    <nav className="pager" aria-label="Pagination" style={{ opacity: pending ? 0.5 : 1 }}>
+      <button className="btn" type="button" disabled={page <= 1 || pending} onClick={() => go({ page: 1 })} aria-label="First page">«</button>
       <button className="btn" type="button" disabled={page <= 1 || pending} onClick={() => go({ page: page - 1 })}>‹ Prev</button>
       <span className="muted" style={{ fontSize: 13 }}>Page {page} of {pageCount}</span>
       <button className="btn" type="button" disabled={page >= pageCount || pending} onClick={() => go({ page: page + 1 })}>Next ›</button>
-    </div>
+      <button className="btn" type="button" disabled={page >= pageCount || pending} onClick={() => go({ page: pageCount })} aria-label="Last page">»</button>
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, margin: "0 0 0 8px", fontSize: 13 }}>
+        <span className="muted">Per page</span>
+        <select value={pageSize} onChange={(e) => go({ pageSize: Number(e.target.value), page: 1 })} style={{ width: "auto", padding: "4px 8px" }} aria-label="Rows per page">
+          {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </label>
+    </nav>
   );
+
+  const Empty = () => (
+    <>
+      No delegates match these filters.
+      {hasFilters && <> <Link href="/delegates">Clear filters</Link></>}
+    </>
+  );
+
+  const showEmail = cols.has("email"), showPhone = cols.has("phone"), showLinkedin = cols.has("linkedin");
+  const colCount = 6 + (showEmail ? 1 : 0) + (showPhone ? 1 : 0) + (showLinkedin ? 1 : 0);
 
   return (
     <>
@@ -153,6 +270,20 @@ export default function DelegatesList({
         <button type="button" className="btn" aria-label="Toggle sort direction" onClick={() => go({ dir: dir === "asc" ? "desc" : "asc", page: 1 })}>{dir === "asc" ? "▲" : "▼"}</button>
       </div>
 
+      {/* Columns menu (desktop table) */}
+      <div className="sp-table" style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <details className="cols-menu">
+          <summary className="btn btn-sm" style={{ cursor: "pointer" }}>Columns{cols.size ? ` · ${cols.size}` : ""}</summary>
+          <div className="card">
+            {OPT_COLS.map((c) => (
+              <label key={c.k}>
+                <input type="checkbox" checked={cols.has(c.k)} onChange={() => toggleCol(c.k)} /> {c.label}
+              </label>
+            ))}
+          </div>
+        </details>
+      </div>
+
       <div className="card sp-table" style={{ opacity: pending ? 0.6 : 1, transition: "opacity .15s", overflowX: "auto" }}>
         <table>
           <thead>
@@ -161,13 +292,17 @@ export default function DelegatesList({
                 <input type="checkbox" checked={allOn} onChange={toggleAll} aria-label="Select all on page" style={{ width: "auto" }} />
               </th>
               <Th k="name">Name</Th><Th k="job_title">Job title</Th><Th k="company">Company</Th>
-              <Th k="edition">Edition</Th><Th k="stage">Status</Th>
+              <Th k="edition">Edition</Th>
+              {showEmail && <th>Email</th>}
+              {showPhone && <th>Phone</th>}
+              {showLinkedin && <th>LinkedIn</th>}
+              <Th k="stage">Status</Th>
             </tr>
           </thead>
           <tbody>
             {data.map((r) => (
               <tr key={r.id} style={sel.has(r.id) ? { background: "var(--hover)" } : undefined}>
-                <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} /></td>
+                <td><input type="checkbox" checked={sel.has(r.id)} onChange={() => toggle(r.id)} style={{ width: "auto" }} aria-label={`Select ${r.name}`} /></td>
                 <td>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                     <Avatar name={r.name} photo={r.photo} seed={r.photoSeed} size={28} />
@@ -177,13 +312,20 @@ export default function DelegatesList({
                 <td className="muted">{r.job_title}</td>
                 <td className="muted">{r.company}</td>
                 <td className="muted">{r.edition}</td>
+                {showEmail && <td className="muted" style={{ fontSize: 13, overflowWrap: "anywhere" }}>{r.email ?? "—"}</td>}
+                {showPhone && <td className="muted" style={{ fontSize: 13, whiteSpace: "nowrap" }}>{r.phone ?? "—"}</td>}
+                {showLinkedin && (
+                  <td className="muted" style={{ fontSize: 13 }}>
+                    {r.linkedin ? <a href={r.linkedin} target="_blank" rel="noreferrer" title={r.linkedin}>{linkedinSlug(r.linkedin)}</a> : "—"}
+                  </td>
+                )}
                 <td>
                   <StageSelect r={r} />
                 </td>
               </tr>
             ))}
             {data.length === 0 && (
-              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>No delegates match these filters.</td></tr>
+              <tr><td colSpan={colCount} className="muted" style={{ textAlign: "center", padding: 24 }}><Empty /></td></tr>
             )}
           </tbody>
         </table>
@@ -200,6 +342,11 @@ export default function DelegatesList({
                 <Link href={detailHref(r.id)} className="sp-name">{r.name}</Link>
                 <div className="sp-sub">{r.job_title}{r.company && r.company !== "—" ? ` · ${r.company}` : ""}</div>
                 <div className="sp-edition">{r.edition}</div>
+                <div className="sp-glyphs" aria-label="Contact data available">
+                  <span className={r.email ? "on" : undefined} title={r.email ? "Has email" : "No email"}>{r.email ? "✓" : "–"} email</span>
+                  <span className={r.phone ? "on" : undefined} title={r.phone ? "Has phone" : "No phone"}>{r.phone ? "✓" : "–"} phone</span>
+                  <span className={r.linkedin ? "on" : undefined} title={r.linkedin ? "Has LinkedIn" : "No LinkedIn"}>{r.linkedin ? "✓" : "–"} LinkedIn</span>
+                </div>
               </div>
             </div>
             <div className="sp-foot">
@@ -209,22 +356,28 @@ export default function DelegatesList({
           </div>
         ))}
         {data.length === 0 && (
-          <div className="card sp-card muted" style={{ textAlign: "center", padding: 20 }}>No delegates match these filters.</div>
+          <div className="card sp-card muted" style={{ textAlign: "center", padding: 20 }}><Empty /></div>
         )}
       </div>
 
-      {pageCount > 1 && <Pager />}
+      {(pageCount > 1 || total > 50) && <Pager />}
 
       <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-        {total} total · click a column to sort · change status inline
-        {sel.size > 0 ? ` · ${sel.size} selected on this page` : ""}
+        {total.toLocaleString()} total · click a column to sort · change status inline
+        {sel.size > 0 ? ` · ${sel.size.toLocaleString()} selected` : ""}
+        {selAllNote ? ` · ${selAllNote}` : ""}
       </p>
 
       {sel.size > 0 && (
-        <div style={{ position: "sticky", bottom: 12, display: "flex", justifyContent: "center", marginTop: 12, zIndex: 30 }}>
-          <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 16px", boxShadow: "0 6px 24px rgba(0,0,0,0.15)" }}>
-            <span style={{ fontSize: 14, fontWeight: 600 }}>{sel.size} selected</span>
-            <button className="btn" type="button" onClick={() => setSel(new Set())}>Clear</button>
+        <div className="bulk-bar">
+          <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 16px", boxShadow: "0 6px 24px rgba(0,0,0,0.15)", flexWrap: "wrap", justifyContent: "center" }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>{sel.size.toLocaleString()} selected</span>
+            {sel.size < total && (
+              <button className="btn" type="button" onClick={selectAll} disabled={selecting}>
+                {selecting ? "Selecting…" : `Select all ${total.toLocaleString()} matching`}
+              </button>
+            )}
+            <button className="btn" type="button" onClick={() => { setSel(new Set()); setSelAllNote(null); }}>Clear</button>
             <button className="btn btn-primary" type="button" onClick={() => setModal(true)}>Push to Instantly</button>
           </div>
         </div>
@@ -282,7 +435,7 @@ function PushModal({ contactIds, onClose, onDone }: { contactIds: string[]; onCl
         className="card modal"
         style={{ maxWidth: 460 }}
       >
-        <h3 id="push-modal-title" style={{ marginTop: 0 }}>Push {contactIds.length} delegate{contactIds.length === 1 ? "" : "s"} to Instantly</h3>
+        <h3 id="push-modal-title" style={{ marginTop: 0 }}>Push {contactIds.length.toLocaleString()} delegate{contactIds.length === 1 ? "" : "s"} to Instantly</h3>
 
         {result ? (
           <div>

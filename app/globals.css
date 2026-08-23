@@ -388,16 +388,12 @@ code { overflow-wrap: anywhere; }
   font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 2px;
 }
 
-/* ── List page: active-filter chips, Columns menu, optional columns ────────── */
-.flt-chip {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 3px 6px 3px 10px;
-  border: 1px solid var(--border); border-radius: 999px; background: #fff; color: var(--text); white-space: nowrap;
+/* ── List page: active-filter chip, Columns menu, optional columns ─────────── */
+.chip-filter {
+  font-size: 12.5px; font-weight: 500; padding: 3px 10px; border: 1px solid var(--border);
+  background: #fff; color: var(--text); text-decoration: none;
 }
-.flt-chip a, .flt-chip button {
-  appearance: none; border: none; background: none; color: var(--muted); cursor: pointer; font-size: 14px;
-  line-height: 1; padding: 0 3px; border-radius: 50%; text-decoration: none;
-}
-.flt-chip a:hover, .flt-chip button:hover { color: var(--danger); }
+.chip-filter:hover { border-color: var(--danger); color: var(--danger); }
 .cols-menu { position: relative; }
 .cols-menu summary { list-style: none; }
 .cols-menu summary::-webkit-details-marker { display: none; }
@@ -412,9 +408,17 @@ code { overflow-wrap: anywhere; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .pager .btn { padding: 6px 10px; }
 
-/* ── Review queue ──────────────────────────────────────────────────────────── */
-.q-diff { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.q-diff .q-old { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.25); }
-.q-diff .q-new { font-weight: 600; }
-.q-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
-.q-count { font-weight: 500; color: var(--muted); font-size: var(--fs-base); margin-left: 8px; }
+/* ── Review queue: current → proposed diff, merge-into-existing menu ───────── */
+.diff { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; font-size: 13.5px; }
+.diff-old { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(0,0,0,0.3); overflow-wrap: anywhere; }
+.diff-arrow { color: var(--muted); }
+.diff-new { font-weight: 600; overflow-wrap: anywhere; }
+.merge-menu summary { list-style: none; cursor: pointer; }
+.merge-menu summary::-webkit-details-marker { display: none; }
+.merge-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.merge-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+}
+/* Add Contact: soft duplicate warning (name+company match — not blocking) */
+.soft-dup { border: 1.5px solid #e8c77a; background: var(--warn-bg); border-radius: 10px; padding: 12px 14px; margin-top: 8px; }

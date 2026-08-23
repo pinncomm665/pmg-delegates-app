@@ -10,16 +10,23 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import type { AppUser } from "./session";
 import { RATE_GUARD_LIMIT, RATE_GUARD_WINDOW_MIN } from "./policy";
 
+// Allowed `kind` values (DB CHECK constraint): email, phone, role, stage,
+// stage_revert, logistics, registration, company, company_new, attach, brief,
+// promo, other. Delegates use `registration` for RegistrationForm saves.
 export type ChangeKind =
   | "stage"
   | "stage_revert"
   | "logistics"
+  | "registration"
   | "phone"
   | "email"
   | "company"
   | "company_new"
   | "attach"
-  | "role";
+  | "role"
+  | "brief"
+  | "promo"
+  | "other";
 
 export type ChangeStatus = "pending" | "auto_applied" | "approved" | "rejected";
 
@@ -134,13 +141,17 @@ export async function getMyChanges(userId: string, kind?: string, limit = 200): 
 export const KIND_LABEL: Record<string, string> = {
   stage: "Stage",
   stage_revert: "Stage (revert)",
-  logistics: "Registration",
+  registration: "Registration",
+  logistics: "Logistics",
   phone: "Phone",
   email: "Email",
   company: "Company",
   company_new: "New company",
   attach: "Attached to event",
   role: "Role / title",
+  brief: "Brief",
+  promo: "Promotion",
+  other: "Other",
 };
 
 export function kindLabel(k: string | null | undefined): string {

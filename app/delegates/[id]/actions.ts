@@ -354,7 +354,7 @@ export async function updateRegistration(formData: FormData) {
 
   if (await isRateGuarded(user)) {
     await logChange(user, {
-      ...base(d), kind: "logistics", field: changedKeys.join(","),
+      ...base(d), kind: "registration", field: changedKeys.join(","),
       current_value: JSON.stringify(before), proposed_value: JSON.stringify(after),
     }, "pending");
     flash(delegateId, "warn", RATE_GUARD_MSG, ret, "registration");
