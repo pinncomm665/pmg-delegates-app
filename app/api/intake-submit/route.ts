@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
   const { submitted_by: _a, submitted_by_email: _b, ...rest } = clientBody as any;
   const body = {
     ...rest,
+    // "Not the same person — add anyway": only ever forwarded as a literal true.
+    force_new: (rest as Record<string, unknown>).force_new === true,
     submitted_by: user.id,
     submitted_by_email: user.email,
   };
