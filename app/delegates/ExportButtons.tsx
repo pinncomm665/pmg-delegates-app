@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+// Mirrors EXPORT_CAP in app/api/delegates/export/route.ts (server caps; this is the notice).
+const EXPORT_CAP = 10_000;
+
 // Export the current filtered delegate view — XLSX download or save to Google
 // Drive as a Sheet (lands in the "PMG Delegate Exports" folder). filterQs is the
 // active filter querystring so the export matches exactly what's on screen.
@@ -35,6 +38,11 @@ export default function ExportButtons({ filterQs, count }: { filterQs: string; c
         </a>
       )}
       {drive.state === "error" && <span className="badge badge-warn" title={drive.msg}>Drive save failed</span>}
+      {count > EXPORT_CAP && (
+        <span className="badge badge-warn" title={`Exports are capped at ${EXPORT_CAP.toLocaleString()} rows — narrow the filters to export everything.`}>
+          Capped at {EXPORT_CAP.toLocaleString()} rows
+        </span>
+      )}
     </div>
   );
 }

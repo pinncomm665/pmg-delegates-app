@@ -16,10 +16,13 @@ import {
   submitEmail,
   addOtherPhone,
   flagRole,
-  removeDelegate,
 } from "./actions";
 import UpdateCompany from "./UpdateCompany";
 import BriefView from "./BriefView";
+import RemoveDelegateDialog from "./RemoveDelegateDialog";
+import ActivityList from "../../ActivityList";
+import { getContactActivity } from "@/lib/changes";
+import { canEdit, NO_ACCESS_MSG } from "@/lib/policy";
 
 export const dynamic = "force-dynamic";
 
@@ -84,8 +87,13 @@ export default async function DelegateDetail({
   const backHref = ret ? `/delegates?${ret}` : "/delegates";
   const es = emailStatusOf(c);
   const esc = es ? emailStatusColors(es) : null;
-  const enrolments = c.id ? await getEnrolments(c.id) : [];
-  const profile = c.id ? await getContactProfile(c.id, "delegate", d.event_id) : null;
+  // Independent reads → one round trip.
+  const [enrolments, profile, activity] = await Promise.all([
+    c.id ? getEnrolments(c.id) : Promise.resolve([]),
+    c.id ? getContactProfile(c.id, "delegate", d.event_id) : Promise.resolve(null),
+    c.id ? getContactActivity(c.id) : Promise.resolve([]),
+  ]);
+  const editable = canEdit(user, { eventId: d.event_id, edition: d.event_edition });
 
   return (
     <Shell user={user}>
@@ -111,6 +119,11 @@ export default async function DelegateDetail({
             style={{ marginTop: 12 }}
           >
             {searchParams.msg}
+          </div>
+        )}
+        {!editable && (
+          <div className="flash flash-warn" style={{ marginTop: 12 }} role="status">
+            Read-only: {NO_ACCESS_MSG}
           </div>
         )}
 
@@ -262,27 +275,19 @@ export default async function DelegateDetail({
                 </div>
 
                 {user.role === "admin" && (
-                  <details style={{ marginTop: 24 }}>
-                    <summary style={{ cursor: "pointer", fontSize: 14, color: "var(--danger)" }}>
-                      Remove from delegates (no longer attending)
-                    </summary>
-                    <form action={removeDelegate} style={{ marginTop: 10 }}>
-                      <input type="hidden" name="delegateId" value={d.id} />
-                      <input type="hidden" name="return" value={ret} />
-                      <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
-                        Permanently removes this delegate role row — use when the person should no
-                        longer be tracked for this event. Secured delegates
-                        (registered / confirmed / attended) can’t be removed.
-                      </p>
-                      <button className="btn btn-danger" type="submit">
-                        Confirm remove
-                      </button>
-                    </form>
-                  </details>
+                  <RemoveDelegateDialog delegateId={d.id} ret={ret} name={c.full_name_clean ?? "this delegate"} />
                 )}
               </div>
             }
             background={<BriefView profile={profile} delegateId={d.id} ret={ret} />}
+            activity={
+              <div>
+                <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+                  Every change made to this contact through the team apps — who, when, what. Newest first.
+                </p>
+                <ActivityList rows={activity} />
+              </div>
+            }
           />
         </div>
     </Shell>

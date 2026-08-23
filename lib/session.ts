@@ -5,34 +5,37 @@ import { supabaseServer } from "./supabaseServer";
 export type AppUser = {
   id: string;
   email: string;
-  role: string; // 'delegate_team' | 'admin' | ...
+  role: string; // 'delegate_team' | 'reviewer' | 'admin' | ...
+  // Optional write scope: edition names and/or event ids from app_metadata.editions.
+  // Absent/empty → full access (today's behaviour). See lib/policy.ts.
+  editions: string[] | null;
 };
 
-// Role is stored on the auth user's metadata when the admin creates the account.
-// app_metadata.role is preferred (not user-editable); fall back to user_metadata.
+// Role + scope live on the auth user's app_metadata (set by the admin when the
+// account is provisioned — NOT user-editable). user_metadata is deliberately
+// ignored: a user could set their own role there.
+function fromAuthUser(u: any): AppUser {
+  const md = (u?.app_metadata ?? {}) as { role?: string; editions?: unknown };
+  const role = typeof md.role === "string" && md.role ? md.role : "delegate_team";
+  const editions = Array.isArray(md.editions)
+    ? (md.editions as unknown[]).map(String).map((s) => s.trim()).filter(Boolean)
+    : null;
+  return { id: u.id, email: u.email ?? "", role, editions: editions && editions.length ? editions : null };
+}
+
 export async function getUser(): Promise<AppUser | null> {
   // Middleware already verified the session and forwarded the user via
   // x-pmg-user — reading it here saves a second auth round trip per render.
   const fwd = headers().get("x-pmg-user");
   if (fwd) {
     try {
-      const u = JSON.parse(decodeURIComponent(fwd));
-      const role =
-        (u.app_metadata as any)?.role ||
-        (u.user_metadata as any)?.role ||
-        "delegate_team";
-      return { id: u.id, email: u.email ?? "", role };
+      return fromAuthUser(JSON.parse(decodeURIComponent(fwd)));
     } catch {}
   }
   const sb = supabaseServer();
   const { data, error } = await sb.auth.getUser();
   if (error || !data.user) return null;
-  const u = data.user;
-  const role =
-    (u.app_metadata as any)?.role ||
-    (u.user_metadata as any)?.role ||
-    "delegate_team";
-  return { id: u.id, email: u.email ?? "", role };
+  return fromAuthUser(data.user);
 }
 
 export async function requireUser(): Promise<AppUser> {
@@ -41,8 +44,23 @@ export async function requireUser(): Promise<AppUser> {
   return u;
 }
 
+export function isAdmin(u: AppUser): boolean {
+  return u.role === "admin";
+}
+
+// admin OR reviewer — may access the review queue and approve/reject.
+export function isReviewer(u: AppUser): boolean {
+  return u.role === "admin" || u.role === "reviewer";
+}
+
 export async function requireAdmin(): Promise<AppUser> {
   const u = await requireUser();
-  if (u.role !== "admin") redirect("/delegates");
+  if (!isAdmin(u)) redirect("/delegates");
+  return u;
+}
+
+export async function requireReviewer(): Promise<AppUser> {
+  const u = await requireUser();
+  if (!isReviewer(u)) redirect("/delegates");
   return u;
 }

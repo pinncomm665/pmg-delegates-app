@@ -78,6 +78,8 @@ export default function Avatar({
           alt=""
           width={px}
           height={px}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           style={{ width: px, height: px, objectFit: "cover", display: "block" }}

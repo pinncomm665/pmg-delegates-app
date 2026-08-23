@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { STAGES, type StageCounts } from "@/lib/data";
 
-// Stage-tab strip shown when an event is selected. Each tab links to the same
-// list with a different `status`, preserving the other filters (brand/edition/
-// search/has-*) and the sort, and resetting to page 1. Horizontally scrollable
-// on mobile.
-const KEEP = ["brand", "edition", "q", "has_valid_email", "has_phone", "has_linkedin", "sort", "dir"] as const;
+// Stage-tab strip — shown for a selected edition AND in the all-editions view
+// (aggregate counts from the grouped view). Each tab links to the same list
+// with a different `status`, preserving the other filters (brand/edition/
+// search/has-*), sort and page size, and resetting to page 1. Horizontally
+// scrollable on mobile. These are links (navigation), so the strip is a <nav>
+// with aria-current rather than a tablist.
+const KEEP = ["brand", "edition", "q", "has_valid_email", "has_phone", "has_linkedin", "sort", "dir", "pageSize"] as const;
 
 export default function StageTabs({
   counts,

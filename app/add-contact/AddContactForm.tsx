@@ -4,10 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+// Soft (name + company) matches the agent may return alongside a non-duplicate
+// verdict — not blocking, but offered as "Attach instead".
+type SoftMatch = { id: string; full_name_clean?: string | null; job_title?: string | null; company_name?: string | null };
+
 type CheckResult =
-  | { duplicate: true; pending_intake?: never; contact: DupContact }
-  | { duplicate: false; pending_intake: true; contact?: never }
-  | { duplicate: false; pending_intake: false; contact?: never };
+  | { duplicate: true; pending_intake?: never; contact: DupContact; soft_matches?: never }
+  | { duplicate: false; pending_intake: true; contact?: never; soft_matches?: SoftMatch[] }
+  | { duplicate: false; pending_intake: false; contact?: never; soft_matches?: SoftMatch[] };
 
 type DupContact = {
   id: string;
@@ -30,7 +34,10 @@ type OutcomeAdded = {
     profile_image_url?: string | null;
   };
 };
-type OutcomePending = { outcome: "pending_review"; request_id: string };
+// The agent's hydration pass may surface name+company candidates (not a
+// LinkedIn match) — shown as a soft warning with "Attach instead".
+type DupCandidate = { contact_id: string; full_name?: string | null; job_title?: string | null; reason?: string | null; confidence?: string | null };
+type OutcomePending = { outcome: "pending_review"; request_id: string; duplicate_candidates?: DupCandidate[] };
 type OutcomeDuplicate = { outcome: "duplicate"; contact: DupContact };
 type OutcomeAttached = {
   outcome: "attached";
@@ -311,16 +318,17 @@ export default function AddContactForm() {
     setCheckResult(null); setOutcome(null); setSubmitError(null);
   };
 
-  // ── Attach existing ("Use this record") ────────────────────────────────────
-  const handleAttach = async () => {
-    if (!checkResult || checkResult.duplicate !== true || submitting) return;
+  // ── Attach existing ("Use this record" / soft-match "Attach instead") ───────
+  const handleAttach = async (contactId?: string) => {
+    const targetId = contactId ?? (checkResult?.duplicate === true ? checkResult.contact.id : null);
+    if (!targetId || submitting) return;
     if (!brand || !role) { setSubmitError("Select a brand and role first."); return; }
     setSubmitting(true);
     setSubmitError(null);
     setOutcome(null);
     try {
       const body: Record<string, string> = {
-        contact_id: checkResult.contact.id,
+        contact_id: targetId,
         event_brand: brand,
         participant_type: role,
       };
@@ -347,6 +355,43 @@ export default function AddContactForm() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const showEditionSelect = brand && brand !== "PMG Roundtables";
+
+  // Soft matches: from the pre-submit check (if the agent returns them) or from
+  // the hydration pass on a pending_review outcome (duplicate_candidates).
+  const softMatches: SoftMatch[] =
+    checkResult && checkResult.duplicate === false && Array.isArray(checkResult.soft_matches)
+      ? checkResult.soft_matches.filter((m) => m && m.id)
+      : [];
+  const pendingCandidates: SoftMatch[] =
+    outcome?.outcome === "pending_review" && Array.isArray(outcome.duplicate_candidates)
+      ? outcome.duplicate_candidates.filter((c) => c && c.contact_id).map((c) => ({ id: c.contact_id, full_name_clean: c.full_name ?? null, job_title: c.job_title ?? null }))
+      : [];
+  const attachReady = !!brand && !!role;
+
+  const SoftDupCard = ({ matches, note }: { matches: SoftMatch[]; note: string }) => (
+    <div className="soft-dup" role="status">
+      <div style={{ fontWeight: 600, color: "var(--warn)", marginBottom: 4, fontSize: 13 }}>Possible duplicate (same name + company)</div>
+      {matches.slice(0, 3).map((m) => (
+        <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "4px 0", fontSize: 13 }}>
+          <div style={{ minWidth: 0 }}>
+            {m.full_name_clean ?? "—"}
+            {m.job_title && <span className="muted"> · {m.job_title}</span>}
+            {m.company_name && <span className="muted"> @ {m.company_name}</span>}
+          </div>
+          <button
+            type="button"
+            className="btn btn-sm"
+            onClick={() => handleAttach(m.id)}
+            disabled={submitting || !attachReady}
+            title={!attachReady ? "Pick brand and role first" : undefined}
+          >
+            Attach instead
+          </button>
+        </div>
+      ))}
+      <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>{note}</p>
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: 560 }}>
@@ -381,6 +426,9 @@ export default function AddContactForm() {
           <p style={{ margin: 0, fontSize: 13 }}>
             Syed will approve, merge, or reject. You'll see the outcome under My Submissions below.
           </p>
+          {pendingCandidates.length > 0 && (
+            <SoftDupCard matches={pendingCandidates} note="If one of these is the same person, attach them to the event instead — the review request stays in the queue for Syed to merge or reject." />
+          )}
           <button
             type="button"
             className="btn"
@@ -452,6 +500,9 @@ export default function AddContactForm() {
             )}
             {checkResult?.duplicate === true && (
               <DupCard c={checkResult.contact} />
+            )}
+            {softMatches.length > 0 && (
+              <SoftDupCard matches={softMatches} note="You can still submit as new if it’s a different person." />
             )}
             {checkResult?.duplicate === false && checkResult.pending_intake && (
               <div
@@ -548,7 +599,7 @@ export default function AddContactForm() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={handleAttach}
+                onClick={() => handleAttach()}
                 disabled={submitting || !brand || !role}
                 style={{ alignSelf: "flex-start" }}
               >

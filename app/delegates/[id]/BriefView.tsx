@@ -1,5 +1,6 @@
 import { generateBrief } from "./actions";
 import type { ContactProfile } from "@/lib/data";
+import BriefPoller from "./BriefPoller";
 
 // Structural renderer — all data-driven, never raw markdown (no pipes bug).
 function Para({ label, text }: { label: string; text?: string | null }) {
@@ -72,6 +73,7 @@ export default function BriefView({ profile, delegateId, ret }: { profile: Conta
 
   return (
     <div>
+      <BriefPoller delegateId={delegateId} status={status} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <p className="muted" style={{ fontSize: 12, margin: 0 }}>
           Attend-value research — why invite them to this summit.
@@ -85,7 +87,7 @@ export default function BriefView({ profile, delegateId, ret }: { profile: Conta
       </div>
 
       {generating ? (
-        <p className="muted" style={{ fontSize: 13 }}>Research in progress — refresh in ~1 minute.</p>
+        <p className="muted" style={{ fontSize: 13 }} role="status">Research in progress — this page refreshes automatically (checking every 10 s).</p>
       ) : !b ? (
         <p className="muted" style={{ fontSize: 13 }}>
           No background notes yet. Click <strong>Generate</strong> to research this delegate — the brief appears here in ~1 minute.

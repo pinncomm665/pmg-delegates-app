@@ -1,5 +1,8 @@
+"use client";
+
 import type { DelegateRow } from "@/lib/data";
 import { updateRegistration } from "./actions";
+import { setDirty, useDirtyGuard } from "../../dirty";
 
 function Check({
   name,
@@ -87,9 +90,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Registration editor. Uncontrolled fields (server action form); an unsaved-
+// changes guard (beforeunload + in-app tab switch via app/dirty.ts) arms on the
+// first edit and disarms on submit.
 export default function RegistrationForm({ d, ret }: { d: DelegateRow; ret: string }) {
+  useDirtyGuard();
   return (
-    <form action={updateRegistration}>
+    <form
+      action={updateRegistration}
+      onChange={() => setDirty(true)}
+      onSubmit={() => setDirty(false)}
+    >
       <input type="hidden" name="delegateId" value={d.id} />
       <input type="hidden" name="return" value={ret} />
 

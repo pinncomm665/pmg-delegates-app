@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import Breadcrumb from "../Breadcrumb";
-import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, STAGES, type SortKey } from "@/lib/data";
+import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, type SortKey } from "@/lib/data";
 import Shell from "../Shell";
 import DelegateSearch from "./DelegateSearch";
 import DelegatesList from "./DelegatesList";
@@ -10,8 +11,14 @@ import { companyDisplay } from "@/lib/company";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_SIZE = 100;
+const PAGE_SIZES = [50, 100, 250] as const;
+const DEFAULT_PAGE_SIZE = 100;
 const SORT_KEYS: SortKey[] = ["name", "job_title", "company", "edition", "stage"];
+const FILTER_KEYS = ["brand", "edition", "status", "q", "has_valid_email", "has_phone", "has_linkedin"] as const;
+
+function bestPhone(c: any): string | null {
+  return (c?.mobile || c?.phone || c?.office_phone || c?.other_phone || null) as string | null;
+}
 
 export default async function DelegatesPage({
   searchParams,
@@ -25,49 +32,73 @@ export default async function DelegatesPage({
     has_phone?: string;
     has_linkedin?: string;
     page?: string;
+    pageSize?: string;
     sort?: string;
     dir?: string;
   };
 }) {
   const user = await requireUser();
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const requestedSize = parseInt(searchParams.pageSize ?? "", 10);
+  const pageSize = (PAGE_SIZES as readonly number[]).includes(requestedSize) ? requestedSize : DEFAULT_PAGE_SIZE;
   const sort: SortKey = SORT_KEYS.includes(searchParams.sort as SortKey)
     ? (searchParams.sort as SortKey)
     : "name";
   const dir: "asc" | "desc" = searchParams.dir === "desc" ? "desc" : "asc";
+  const q = (searchParams.q ?? "").trim() || undefined;
 
   const filters = {
-    brand: searchParams.brand,
-    edition: searchParams.edition,
-    status: searchParams.status,
-    q: searchParams.q,
+    brand: searchParams.brand || undefined,
+    edition: searchParams.edition || undefined,
+    status: searchParams.status || undefined,
+    q,
     hasValidEmail: searchParams.has_valid_email === "1",
     hasPhone: searchParams.has_phone === "1",
     hasLinkedin: searchParams.has_linkedin === "1",
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     sort,
     dir,
   };
   const [{ rows, total }, options, stageCounts] = await Promise.all([
     getDelegates(filters),
     getFilterOptions(),
-    searchParams.edition ? getStageCounts(filters) : Promise.resolve(null),
+    getStageCounts(filters),
   ]);
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   // Filter-only querystring — the base a detail page links back to and that the
   // list's sort/page controls extend.
   const qs = new URLSearchParams();
-  for (const k of ["brand", "edition", "status", "q", "has_valid_email", "has_phone", "has_linkedin"] as const) {
+  for (const k of FILTER_KEYS) {
     if (searchParams[k]) qs.set(k, searchParams[k] as string);
   }
   const filterQs = qs.toString();
+  const anyFilter = FILTER_KEYS.some((k) => !!searchParams[k]);
   const extraCount = [
     searchParams.has_valid_email,
     searchParams.has_phone,
     searchParams.has_linkedin,
   ].filter((v) => v === "1").length;
+
+  // Same view without the search term (the removable "q" chip's target).
+  const withoutQ = new URLSearchParams(filterQs);
+  withoutQ.delete("q");
+  if (searchParams.sort) withoutQ.set("sort", searchParams.sort);
+  if (searchParams.dir) withoutQ.set("dir", searchParams.dir);
+  if (searchParams.pageSize) withoutQ.set("pageSize", searchParams.pageSize);
+  const withoutQHref = `/delegates${withoutQ.toString() ? `?${withoutQ.toString()}` : ""}`;
+
+  // What the typeahead's "open delegate" should come back to (filters + sort + page).
+  const returnQs = (() => {
+    const p = new URLSearchParams(filterQs);
+    p.set("page", String(page)); p.set("sort", sort); p.set("dir", dir);
+    if (pageSize !== DEFAULT_PAGE_SIZE) p.set("pageSize", String(pageSize));
+    return p.toString();
+  })();
+
+  const upcoming = options.editionOptions.filter((o) => o.upcoming);
+  const past = options.editionOptions.filter((o) => !o.upcoming);
 
   return (
     <Shell user={user}>
@@ -81,8 +112,13 @@ export default async function DelegatesPage({
           ]}
         />
         <div className="page-head-aside">
+          {q && (
+            <Link href={withoutQHref} className="chip chip-filter" title="Remove search filter" aria-label={`Remove search filter “${q}”`}>
+              “{q}” <span aria-hidden="true">×</span>
+            </Link>
+          )}
           <span style={{ fontSize: 13, color: "var(--muted)", whiteSpace: "nowrap" }}>
-            <strong style={{ color: "var(--text)", fontSize: 15 }}>{total}</strong> delegate{total === 1 ? "" : "s"}
+            <strong style={{ color: "var(--text)", fontSize: 15 }}>{total.toLocaleString()}</strong> delegate{total === 1 ? "" : "s"}
           </span>
         </div>
       </div>
@@ -91,30 +127,40 @@ export default async function DelegatesPage({
         method="get"
         className="card section flt"
         style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}
+        role="search"
+        aria-label="Filter delegates"
       >
+        {/* Sort / page size survive Apply; page resets to 1 by omission. */}
+        <input type="hidden" name="sort" value={sort} />
+        <input type="hidden" name="dir" value={dir} />
+        {pageSize !== DEFAULT_PAGE_SIZE && <input type="hidden" name="pageSize" value={pageSize} />}
+        {searchParams.status && <input type="hidden" name="status" value={searchParams.status} />}
+
         {/* Row 1 — filters + More + Apply (one row on desktop, stacked on mobile) */}
         <div className="flt-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <select name="brand" defaultValue={searchParams.brand ?? ""} style={{ flex: 1, minWidth: 0 }}>
+          <select name="brand" defaultValue={searchParams.brand ?? ""} style={{ flex: 1, minWidth: 0 }} aria-label="Brand">
             <option value="">All events</option>
             {options.brands.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
           </select>
-          <select name="edition" defaultValue={searchParams.edition ?? ""} style={{ flex: 1, minWidth: 0 }}>
+          <select name="edition" defaultValue={searchParams.edition ?? ""} style={{ flex: 1, minWidth: 0 }} aria-label="Edition">
             <option value="">All editions</option>
-            {options.editions.map((e) => (
-              <option key={e} value={e}>{e}</option>
-            ))}
+            {upcoming.length > 0 && (
+              <optgroup label="Upcoming">
+                {upcoming.map((e) => (
+                  <option key={e.name} value={e.name}>{e.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {past.length > 0 && (
+              <optgroup label={upcoming.length > 0 ? "Past / other" : "Editions"}>
+                {past.map((e) => (
+                  <option key={e.name} value={e.name}>{e.name}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
-          {/* Status filter — hidden when an event is selected (the stage tabs below take over) */}
-          {!searchParams.edition && (
-            <select name="status" defaultValue={searchParams.status ?? ""} style={{ flex: 1, minWidth: 0 }}>
-              <option value="">All statuses</option>
-              {STAGES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
-              ))}
-            </select>
-          )}
 
           <details className="flt-more" style={{ position: "relative" }}>
             <summary className="btn" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -137,22 +183,22 @@ export default async function DelegatesPage({
           </details>
 
           <button className="btn btn-primary" type="submit" style={{ whiteSpace: "nowrap" }}>Apply</button>
+          {anyFilter && (
+            <Link href="/delegates" className="btn" style={{ whiteSpace: "nowrap", textDecoration: "none" }}>Reset</Link>
+          )}
         </div>
 
+        {/* Row 2 — ONE search: typeahead + Enter-to-filter (this is the form's q) */}
+        <div className="flt-row" style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <DelegateSearch initialQ={q ?? ""} returnQs={returnQs} />
+          </div>
+          <ExportButtons filterQs={filterQs} count={total} />
+        </div>
       </form>
 
-      {/* Stage tabs — only when an event is selected; each tab = a stage with its per-event count */}
-      {stageCounts && (
-        <StageTabs counts={stageCounts} current={searchParams.status} searchParams={searchParams} />
-      )}
-
-      {/* Row 2 — typeahead picker + export of the current filtered view */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ flex: 1, minWidth: 220 }}>
-          <DelegateSearch />
-        </div>
-        <ExportButtons filterQs={filterQs} count={total} />
-      </div>
+      {/* Stage tabs — per edition, or aggregate counts in the all-editions view */}
+      <StageTabs counts={stageCounts} current={searchParams.status} searchParams={searchParams} />
 
       <DelegatesList
         rows={rows.map((r) => ({
@@ -166,10 +212,15 @@ export default async function DelegatesPage({
           stage: (r.stage ?? "identified").toLowerCase(),
           stageLabel: stageLabel(r.stage),
           stageClass: stageBadgeClass(r.stage),
+          email: r.contact?.email ?? null,
+          phone: bestPhone(r.contact),
+          linkedin: r.contact?.linkedin_url_canonical ?? null,
         }))}
         filterQs={filterQs}
+        hasFilters={anyFilter}
         page={page}
         pageCount={pageCount}
+        pageSize={pageSize}
         total={total}
         sort={sort}
         dir={dir}

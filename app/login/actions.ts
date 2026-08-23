@@ -9,7 +9,11 @@ export async function login(formData: FormData) {
   const sb = supabaseServer();
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect("/login?error=" + encodeURIComponent("Invalid email or password"));
+    // Keep the typed email so the user only re-enters the password.
+    redirect(
+      "/login?error=" + encodeURIComponent("Invalid email or password") +
+      (email ? "&email=" + encodeURIComponent(email) : "")
+    );
   }
   redirect("/dashboard");
 }
