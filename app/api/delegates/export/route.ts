@@ -13,7 +13,10 @@ const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
 // Google Sheet in the "PMG Delegate Exports" Drive folder (?mode=drive). The
 // filtered query runs here (single source of filter logic); the spreadsheet /
 // Drive build is delegated to pmg-agent's shared utils.
-const COLUMNS = ["Name", "Job Title", "Company", "Edition", "Status", "Owner", "Ticket", "Paid", "Email", "Phone", "LinkedIn", "Country"];
+// Work Email (contacts.email — the cold-outreach address) and Personal Email
+// (warm/manual only) are SEPARATE columns: the team needs to see which address
+// they're looking at, so this must never collapse back to one fallback column.
+const COLUMNS = ["Name", "Job Title", "Edition", "Company", "Work Email", "Personal Email", "Phone", "Status", "Owner", "Ticket", "Paid", "LinkedIn", "Country"];
 const EXPORT_CAP = 10_000; // mirrored in app/delegates/ExportButtons.tsx
 
 // Safe download filename: "Delegates - VERIFY Saudi Arabia 2026 - 2026-08-23.xlsx"
@@ -48,14 +51,15 @@ export async function GET(request: NextRequest) {
     return {
       Name: c.full_name_clean ?? "",
       "Job Title": c.job_title ?? "",
-      Company: companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "",
       Edition: r.event_edition ?? "",
+      Company: companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "",
+      "Work Email": c.email ?? "",
+      "Personal Email": c.personal_email ?? "",
+      Phone: formatPhone(c.phone ?? c.mobile ?? c.office_phone ?? c.other_phone) ?? "",
       Status: stageLabel(r.stage),
       Owner: ownerDisplayName(r.owner_email) ?? "",
       Ticket: r.ticket_type ?? "",
       Paid: r.payment_received ? "Yes" : "",
-      Email: c.email ?? c.personal_email ?? "",
-      Phone: formatPhone(c.phone ?? c.mobile ?? c.office_phone ?? c.other_phone) ?? "",
       LinkedIn: c.linkedin_url_canonical ?? "",
       Country: c.location_country ?? "",
     };
