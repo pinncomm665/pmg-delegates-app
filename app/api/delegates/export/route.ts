@@ -16,7 +16,7 @@ const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
 // Work Email (contacts.email — the cold-outreach address) and Personal Email
 // (warm/manual only) are SEPARATE columns: the team needs to see which address
 // they're looking at, so this must never collapse back to one fallback column.
-const COLUMNS = ["Name", "Job Title", "Edition", "Company", "Work Email", "Personal Email", "Phone", "Status", "Owner", "Ticket", "Paid", "LinkedIn", "Country"];
+const COLUMNS = ["Name", "Job Title", "Edition", "Company", "Work Email", "Personal Email", "Phone", "Ticket Type", "Status", "Owner", "Paid", "LinkedIn", "Country"];
 const EXPORT_CAP = 10_000; // mirrored in app/delegates/ExportButtons.tsx
 
 // Safe download filename: "Delegates - VERIFY Saudi Arabia 2026 - 2026-08-23.xlsx"
@@ -56,9 +56,11 @@ export async function GET(request: NextRequest) {
       "Work Email": c.email ?? "",
       "Personal Email": c.personal_email ?? "",
       Phone: formatPhone(c.phone ?? c.mobile ?? c.office_phone ?? c.other_phone) ?? "",
+      // delegates.ticket_type — the pass they hold (Standard / VIP / Speaker pass).
+      // Named in full: "Ticket" alone read as a booking reference, not the pass tier.
+      "Ticket Type": r.ticket_type ?? "",
       Status: stageLabel(r.stage),
       Owner: ownerDisplayName(r.owner_email) ?? "",
-      Ticket: r.ticket_type ?? "",
       Paid: r.payment_received ? "Yes" : "",
       LinkedIn: c.linkedin_url_canonical ?? "",
       Country: c.location_country ?? "",
