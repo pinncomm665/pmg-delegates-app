@@ -114,8 +114,12 @@ export default async function DelegatesPage({
           items={[
             { label: "Home", href: "/dashboard" },
             { label: "Delegates", href: "/delegates" },
-            { label: searchParams.edition || "All", href: searchParams.edition ? `/delegates?edition=${encodeURIComponent(searchParams.edition)}` : "/delegates" },
-            { label: searchParams.status ? stageLabel(searchParams.status) : "All" },
+            // Only real filters become crumbs — an unfiltered view used to end on
+            // a bare "All", which read as the page's name.
+            ...(searchParams.edition
+              ? [{ label: searchParams.edition, href: `/delegates?edition=${encodeURIComponent(searchParams.edition)}` }]
+              : []),
+            ...(searchParams.status ? [{ label: stageLabel(searchParams.status) }] : []),
           ]}
         />
         <div className="page-head-aside">

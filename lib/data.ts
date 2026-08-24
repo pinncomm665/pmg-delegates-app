@@ -588,6 +588,7 @@ export const STAGES: { value: string; label: string }[] = [
   { value: "identified", label: "Identified" },
   { value: "shortlisted", label: "Shortlisted" },
   { value: "invited", label: "Invited" },
+  { value: "interested", label: "Interested" },
   { value: "applied", label: "Applied" },
   { value: "registered", label: "Registered" },
   { value: "confirmed", label: "Confirmed" },
