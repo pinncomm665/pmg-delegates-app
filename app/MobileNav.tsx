@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import NavLinks, { type NavItem } from "./NavLinks";
+import NavLinks from "./NavLinks";
+import { NAV_SECTIONS, type NavGroups } from "./navModel";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -11,13 +12,11 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 // hamburger that opens a slide-in navigation sheet (Esc / backdrop close,
 // focus trap, body scroll lock) + a fixed 3-item bottom tab bar.
 export default function MobileNav({
-  views,
-  filters,
+  groups,
   email,
   signOut,
 }: {
-  views: NavItem[];
-  filters: NavItem[];
+  groups: NavGroups;
   email: string;
   signOut: ReactNode;
 }) {
@@ -61,7 +60,7 @@ export default function MobileNav({
   return (
     <>
       <div className="m-topbar">
-        <span className="brand">PMG Delegates</span>
+        <Link href="/dashboard" className="brand brand-link" aria-label="PMG Delegates — Pulse dashboard">PMG Delegates</Link>
         <button
           ref={btnRef}
           type="button"
@@ -87,21 +86,23 @@ export default function MobileNav({
             <div className="m-sheet-backdrop" onClick={close} />
             <div className="m-sheet-panel" ref={panelRef}>
               <div className="brand">
-                <span>PMG Delegates</span>
+                <Link href="/dashboard" className="brand-link" onClick={close}>PMG Delegates</Link>
                 <button type="button" className="m-menu-btn" aria-label="Close menu" onClick={close}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                     <path d="M6 6l12 12" /><path d="M18 6L6 18" />
                   </svg>
                 </button>
               </div>
-              <div className="sb-label">Views</div>
-              <nav aria-label="Views">
-                <Suspense fallback={null}><NavLinks items={views} onNavigate={close} /></Suspense>
-              </nav>
-              <div className="sb-label">Quick filters</div>
-              <nav aria-label="Quick filters">
-                <Suspense fallback={null}><NavLinks items={filters} onNavigate={close} /></Suspense>
-              </nav>
+              {NAV_SECTIONS.map(({ key, label }) =>
+                groups[key].length > 0 ? (
+                  <div key={key}>
+                    <div className="sb-label">{label}</div>
+                    <nav aria-label={label}>
+                      <Suspense fallback={null}><NavLinks items={groups[key]} onNavigate={close} /></Suspense>
+                    </nav>
+                  </div>
+                ) : null
+              )}
               <div className="spacer" />
               {signOut}
               <div className="who">{email}</div>

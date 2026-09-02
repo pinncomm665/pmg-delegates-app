@@ -13,8 +13,9 @@ export default async function AddContactPage() {
       <div style={{ maxWidth: 560 }}>
         <Breadcrumb items={[{ label: "Home", href: "/dashboard" }, { label: "Add Contact" }]} />
         <p className="muted" style={{ marginTop: 4, marginBottom: 20, fontSize: 13 }}>
-          Paste a LinkedIn URL to add a new contact. No free-text fields — the CRM
-          will be hydrated automatically from LinkedIn.
+          Paste a LinkedIn profile URL to add someone to the CRM. The server
+          enriches the contact automatically — no manual name or title entry
+          needed.
         </p>
         <AddContactForm />
       </div>

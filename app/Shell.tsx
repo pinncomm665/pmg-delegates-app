@@ -1,9 +1,12 @@
-import Sidebar, { SignOut, filterItems, viewItems } from "./Sidebar";
+import Sidebar, { SignOut, buildNavGroups } from "./Sidebar";
 import MobileNav from "./MobileNav";
 import { ToastProvider } from "./Toast";
 import DialerProvider from "./DialerProvider";
 import type { AppUser } from "@/lib/session";
 
+// Resolves the nav once and renders both shells: the desktop left rail and the
+// phone top bar + sheet + tab bar. CSS decides which one shows (globals.css,
+// 760px breakpoint).
 export default function Shell({
   user,
   children,
@@ -11,12 +14,13 @@ export default function Shell({
   user: AppUser;
   children: React.ReactNode;
 }) {
+  const groups = buildNavGroups(user);
   return (
     <ToastProvider>
       <DialerProvider>
         <div className="shell">
-          <Sidebar user={user} />
-          <MobileNav views={viewItems(user)} filters={filterItems} email={user.email} signOut={<SignOut />} />
+          <Sidebar user={user} groups={groups} />
+          <MobileNav groups={groups} email={user.email} signOut={<SignOut />} />
           <main className="main">{children}</main>
         </div>
       </DialerProvider>

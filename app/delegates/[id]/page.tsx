@@ -12,6 +12,7 @@ import Shell from "../../Shell";
 import Breadcrumb from "../../Breadcrumb";
 import { updateStatus, flagRole } from "./actions";
 import OwnerChip from "./OwnerChip";
+import StagePill from "./StagePill";
 import { ownerFirstName, ownerOptions } from "@/lib/roleOwner";
 import { emailStatusOf } from "@/lib/emailstatus";
 import ContactDetails from "./ContactDetails";
@@ -106,7 +107,7 @@ export default async function DelegateDetail({
             </div>
             <div className="sp-head-actions">
               {c.id && <LogActivity delegateId={d.id} contactId={c.id} ret={ret} disabled={!editable} />}
-              <span className={stageBadgeClass(d.stage)}>{stageLabel(d.stage)}</span>
+              <StagePill delegateId={d.id} stage={d.stage} disabled={!editable} />
               <OwnerChip
                 delegateId={d.id}
                 ownerEmail={d.owner_email ?? null}

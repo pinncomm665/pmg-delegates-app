@@ -1,25 +1,31 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { logout } from "./login/actions";
 import { isReviewer, type AppUser } from "@/lib/session";
 import NavLinks, { type NavItem } from "./NavLinks";
+import { NAV_SECTIONS, type NavGroups } from "./navModel";
+export type { NavGroups } from "./navModel";
 
-export function viewItems(user: AppUser): NavItem[] {
+export const listItems: NavItem[] = [
+  { href: "/delegates", label: "All delegates" },
+];
+
+export function actionItems(user: AppUser): NavItem[] {
   return [
-    { href: "/dashboard", label: "Pulse dashboard" },
-    { href: "/delegates", label: "All delegates" },
     { href: "/add-contact", label: "Add Contact" },
     { href: "/my-changes", label: "My changes" },
-    { href: "/activity", label: "Activity Report" },
     ...(isReviewer(user) ? [{ href: "/admin/queue", label: "Review queue" }] : []),
   ];
 }
 
-export const filterItems: NavItem[] = [
-  { href: "/delegates?status=identified", label: "Identified" },
-  { href: "/delegates?status=invited", label: "Invited" },
-  { href: "/delegates?status=registered", label: "Registered" },
-  { href: "/delegates?status=confirmed", label: "Confirmed" },
+export const reportItems: NavItem[] = [
+  { href: "/activity", label: "Activity Report" },
+  { href: "/dashboard", label: "Pulse dashboard" },
 ];
+
+export function buildNavGroups(user: AppUser): NavGroups {
+  return { lists: listItems, actions: actionItems(user), reports: reportItems };
+}
 
 export function SignOut() {
   return (
@@ -32,24 +38,25 @@ export function SignOut() {
 }
 
 // Desktop left rail (hidden ≤760px — see MobileNav for the phone shell).
-export default function Sidebar({ user }: { user: AppUser }) {
+export default function Sidebar({ user, groups }: { user: AppUser; groups: NavGroups }) {
   return (
     <aside className="sidebar">
-      <div className="brand">PMG Delegates</div>
+      <Link href="/dashboard" className="brand brand-link" aria-label="PMG Delegates — Pulse dashboard">
+        PMG Delegates
+      </Link>
 
-      <div className="sb-label">Views</div>
-      <nav aria-label="Views">
-        <Suspense fallback={null}>
-          <NavLinks items={viewItems(user)} />
-        </Suspense>
-      </nav>
-
-      <div className="sb-label">Quick filters</div>
-      <nav aria-label="Quick filters">
-        <Suspense fallback={null}>
-          <NavLinks items={filterItems} />
-        </Suspense>
-      </nav>
+      {NAV_SECTIONS.map(({ key, label }) =>
+        groups[key].length > 0 ? (
+          <div key={key}>
+            <div className="sb-label">{label}</div>
+            <nav aria-label={label}>
+              <Suspense fallback={null}>
+                <NavLinks items={groups[key]} />
+              </Suspense>
+            </nav>
+          </div>
+        ) : null
+      )}
 
       <div className="spacer" />
       <SignOut />

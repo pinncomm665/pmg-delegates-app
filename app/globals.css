@@ -141,6 +141,9 @@ code { overflow-wrap: anywhere; }
   display: flex; flex-direction: column; gap: 2px;
 }
 .sidebar .brand { font-weight: 600; padding: 4px 8px 12px; display: flex; align-items: center; gap: 8px; }
+/* App name doubles as the Pulse dashboard link (desktop rail + phone shell). */
+.brand-link { color: var(--text); text-decoration: none; }
+.brand-link:hover { text-decoration: underline; }
 .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
 .sidebar nav a {
   display: block; padding: 8px 10px; border-radius: 8px;

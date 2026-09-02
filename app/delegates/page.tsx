@@ -4,7 +4,7 @@ import Breadcrumb from "../Breadcrumb";
 import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, type SortKey } from "@/lib/data";
 import { formatPhone } from "@/lib/phone";
 import Shell from "../Shell";
-import DelegateSearch from "./DelegateSearch";
+import ListSearch from "../ListSearch";
 import DelegatesList from "./DelegatesList";
 import ExportButtons from "./ExportButtons";
 import StageTabs from "./StageTabs";
@@ -155,7 +155,7 @@ export default async function DelegatesPage({
           extraCount={extraCount}
           showReset={anyFilter}
           resetHref="/delegates"
-          search={<DelegateSearch initialQ={q ?? ""} returnQs={returnQs} />}
+          search={<ListSearch initialQ={q ?? ""} returnQs={returnQs} searchApi="/api/delegates/search" detailBase="/delegates" noun="delegate" idPrefix="dg" />}
           exportButtons={<ExportButtons filterQs={filterQs} count={total} />}
           extras={
             <>

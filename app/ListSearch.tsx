@@ -11,18 +11,26 @@ type Hit = {
   edition: string | null;
 };
 
-// ONE search box, two behaviours:
+// ONE search box, two behaviours (shared by the attendees + speakers lists):
 //   • type → typeahead suggestions; ↓/↑ to highlight, Enter/click on a highlighted
-//     suggestion → open that delegate (with ?return= so "back" lands on this view)
+//     suggestion → open that record (with ?return= so "back" lands on this view)
 //   • Enter with NO suggestion highlighted → the surrounding filter form submits
 //     and the list is filtered by ?q= (this input is the form's `q` field).
 // Each keystroke aborts the previous fetch (AbortController).
-export default function DelegateSearch({
+export default function ListSearch({
   initialQ = "",
   returnQs = "",
+  searchApi,      // e.g. /api/roundtables/search
+  detailBase,     // e.g. /roundtables
+  noun,           // "attendee" | "speaker"
+  idPrefix,
 }: {
   initialQ?: string;
   returnQs?: string;
+  searchApi: string;
+  detailBase: string;
+  noun: string;
+  idPrefix: string;
 }) {
   const router = useRouter();
   const [q, setQ] = useState(initialQ);
@@ -45,7 +53,7 @@ export default function DelegateSearch({
     const ctrl = new AbortController();
     setLoading(true);
     const t = setTimeout(() => {
-      fetch(`/api/delegates/search?q=${encodeURIComponent(q.trim())}`, { signal: ctrl.signal })
+      fetch(`${searchApi}?q=${encodeURIComponent(q.trim())}`, { signal: ctrl.signal })
         .then((r) => r.json())
         .then((d) => {
           setHits(d.results ?? []);
@@ -56,7 +64,7 @@ export default function DelegateSearch({
         .finally(() => { if (!ctrl.signal.aborted) setLoading(false); });
     }, 200);
     return () => { clearTimeout(t); ctrl.abort(); };
-  }, [q]);
+  }, [q, searchApi]);
 
   // close on outside click
   useEffect(() => {
@@ -70,10 +78,10 @@ export default function DelegateSearch({
   const go = (h: Hit) => {
     setOpen(false);
     const ret = returnQs ? `?return=${encodeURIComponent(returnQs)}` : "";
-    router.push(`/delegates/${h.id}${ret}`);
+    router.push(`${detailBase}/${h.id}${ret}`);
   };
 
-  const listId = "dlg-search-list";
+  const listId = `${idPrefix}-search-list`;
 
   return (
     <div ref={boxRef} style={{ position: "relative" }}>
@@ -83,13 +91,13 @@ export default function DelegateSearch({
         onChange={(e) => { typed.current = true; setQ(e.target.value); }}
         onFocus={() => hits.length && setOpen(true)}
         placeholder="Search by name or company — Enter to filter the list"
-        aria-label="Search delegates"
+        aria-label={`Search ${noun}s`}
         autoComplete="off"
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && active >= 0 && hits[active] ? `dlg-opt-${hits[active].id}` : undefined}
+        aria-activedescendant={open && active >= 0 && hits[active] ? `${idPrefix}-opt-${hits[active].id}` : undefined}
         onKeyDown={(e) => {
           if (e.key === "Escape") { setOpen(false); return; }
           if (!open || hits.length === 0) return; // Enter → native form submit (filter by q)
@@ -109,13 +117,13 @@ export default function DelegateSearch({
           {loading && hits.length === 0 ? (
             <div className="muted" style={{ fontSize: 13, padding: "8px 10px" }}>Searching…</div>
           ) : hits.length === 0 ? (
-            <div className="muted" style={{ fontSize: 13, padding: "8px 10px" }}>No delegates found — press Enter to filter the list anyway.</div>
+            <div className="muted" style={{ fontSize: 13, padding: "8px 10px" }}>No {noun}s found — press Enter to filter the list anyway.</div>
           ) : (
             <>
               {hits.map((h, i) => (
                 <button
                   key={h.id}
-                  id={`dlg-opt-${h.id}`}
+                  id={`${idPrefix}-opt-${h.id}`}
                   type="button"
                   role="option"
                   aria-selected={i === active}
@@ -135,7 +143,7 @@ export default function DelegateSearch({
                 </button>
               ))}
               <div className="muted" style={{ fontSize: 11, padding: "6px 10px", borderTop: "1px solid var(--border)" }}>
-                ↑↓ pick a delegate · Enter filters the list by “{q.trim()}”
+                ↑↓ pick a {noun} · Enter filters the list by “{q.trim()}”
               </div>
             </>
           )}
