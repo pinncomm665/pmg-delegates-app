@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useDialog } from "./useDialog";
-import { useToast } from "./Toast";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
+import { useToast } from "@pmg/team-ui/ui/Toast";
 import { changeRole } from "./roleActions";
 
 // Header chip "Role: Delegate" (top-right, next to the stage pill). Click →

@@ -13,7 +13,7 @@ import {
   type SummaryPeriod,
 } from "@/lib/data";
 import Shell from "../Shell";
-import Breadcrumb from "../Breadcrumb";
+import Breadcrumb from "@pmg/team-ui/ui/Breadcrumb";
 import ActivityReport from "./ActivityReport";
 
 export const dynamic = "force-dynamic";

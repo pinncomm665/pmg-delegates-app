@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import { getDelegate, STAGE_VALUES } from "@/lib/data";
 import { canEdit, stageChangeNeedsReview, NO_ACCESS_MSG } from "@/lib/policy";
 import { logChange, isRateGuarded, RATE_GUARD_MSG } from "@/lib/changes";

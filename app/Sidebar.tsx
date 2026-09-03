@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { logout } from "./login/actions";
 import { isReviewer, type AppUser } from "@/lib/session";
-import NavLinks, { type NavItem } from "./NavLinks";
+import NavLinks, { type NavItem } from "@pmg/team-ui/ui/NavLinks";
 import { NAV_SECTIONS, type NavGroups } from "./navModel";
 export type { NavGroups } from "./navModel";
 

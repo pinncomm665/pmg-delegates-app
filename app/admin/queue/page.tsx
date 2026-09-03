@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { requireUser, isReviewer, isAdmin } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import { normalizeBrand } from "@/lib/brands";
 import { kindLabel, timeAgo, hoursSince, type ChangeRow } from "@/lib/changes";
 import Shell from "../../Shell";
-import Breadcrumb from "../../Breadcrumb";
+import Breadcrumb from "@pmg/team-ui/ui/Breadcrumb";
 import { approveRequest, rejectRequest, removeDelegateFromQueue, approveIntake, mergeIntake, rejectIntake } from "./actions";
 import { fetchPendingIntake } from "./intake";
 

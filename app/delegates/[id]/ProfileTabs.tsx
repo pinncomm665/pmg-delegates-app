@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { confirmLeave } from "../../dirty";
+import { confirmLeave } from "@pmg/team-ui/ui/dirty";
 
 // Valid `?tab=` keys (anything else → first tab):
 //   contact       Contact Information   (default — omitted from the URL)

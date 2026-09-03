@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { DelegateRow } from "@/lib/data";
 import { updateRegistration } from "./actions";
-import { setDirty, useDirtyGuard } from "../../dirty";
+import { setDirty, useDirtyGuard } from "@pmg/team-ui/ui/dirty";
 
 function Check({ name, label, checked }: { name: string; label: string; checked?: boolean | null }) {
   return (

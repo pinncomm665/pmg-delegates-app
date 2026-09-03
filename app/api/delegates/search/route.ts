@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { getDelegates } from "@/lib/data";
-import { companyDisplay } from "@/lib/company";
+import { companyDisplay } from "@pmg/team-ui/lib/company";
 
 export const dynamic = "force-dynamic";
 

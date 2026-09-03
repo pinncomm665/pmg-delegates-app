@@ -1,7 +1,7 @@
 import Sidebar, { SignOut, buildNavGroups } from "./Sidebar";
 import MobileNav from "./MobileNav";
-import { ToastProvider } from "./Toast";
-import DialerProvider from "./DialerProvider";
+import { ToastProvider } from "@pmg/team-ui/ui/Toast";
+import DialerProvider from "@pmg/team-ui/ui/DialerProvider";
 import type { AppUser } from "@/lib/session";
 
 // Resolves the nav once and renders both shells: the desktop left rail and the

@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/session";
 import Shell from "../Shell";
-import Breadcrumb from "../Breadcrumb";
+import Breadcrumb from "@pmg/team-ui/ui/Breadcrumb";
 import AddContactForm from "./AddContactForm";
 
 export const dynamic = "force-dynamic";

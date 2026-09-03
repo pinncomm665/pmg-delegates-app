@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useDialog } from "../../useDialog";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
 import { removeDelegate } from "./actions";
 
 // Admin-only: hard-delete the delegate role row behind a typed confirmation

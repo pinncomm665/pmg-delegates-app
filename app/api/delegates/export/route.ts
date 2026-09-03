@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { getDelegates, stageLabel } from "@/lib/data";
-import { formatPhone } from "@/lib/phone";
-import { companyDisplay } from "@/lib/company";
+import { formatPhone } from "@pmg/team-ui/lib/phone";
+import { companyDisplay } from "@pmg/team-ui/lib/company";
 import { ownerDisplayName, parseOwnerFilter } from "@/lib/roleOwner";
 
 export const dynamic = "force-dynamic";

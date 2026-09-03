@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, isReviewer } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { getNoteTranscripts, requestTranscription } from "@/lib/notes";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
+import { getNoteTranscripts, requestTranscription } from "@pmg/team-ui/lib/notes";
 
 export const dynamic = "force-dynamic";
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { getMyChanges, KIND_LABEL } from "@/lib/changes";
 import Shell from "../Shell";
-import Breadcrumb from "../Breadcrumb";
+import Breadcrumb from "@pmg/team-ui/ui/Breadcrumb";
 import ActivityList from "../ActivityList";
 
 export const dynamic = "force-dynamic";

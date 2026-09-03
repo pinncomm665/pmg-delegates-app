@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, requireReviewer } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import { STAGE_VALUES } from "@/lib/data";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone } from "@pmg/team-ui/lib/phone";
 import { postIntakeReview } from "./intake";
 
 // All queue actions end with a redirect carrying a one-line success flash.

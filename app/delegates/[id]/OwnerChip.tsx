@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDialog } from "../../useDialog";
-import { useToast } from "../../Toast";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
+import { useToast } from "@pmg/team-ui/ui/Toast";
 import { setRoleOwner } from "./actions";
 import { Spinner } from "./FieldEditor";
 

@@ -8,7 +8,7 @@
 // Semantics mirror roundtables-app lib/roleMove.ts (locked with Syed
 // 2026-08-23): hard delete of the source row; the reverse move lives in the
 // speakers app.
-import { supabaseAdmin } from "./supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import type { AppUser } from "./session";
 import { getDelegate, isMissingColumnError } from "./data";
 import { canEdit, NO_ACCESS_MSG } from "./policy";

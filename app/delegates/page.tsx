@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
-import Breadcrumb from "../Breadcrumb";
+import Breadcrumb from "@pmg/team-ui/ui/Breadcrumb";
 import { getDelegates, getStageCounts, getFilterOptions, stageBadgeClass, stageLabel, type SortKey } from "@/lib/data";
-import { formatPhone } from "@/lib/phone";
+import { formatPhone } from "@pmg/team-ui/lib/phone";
 import Shell from "../Shell";
-import ListSearch from "../ListSearch";
+import ListSearch from "@pmg/team-ui/ui/ListSearch";
 import DelegatesList from "./DelegatesList";
 import ExportButtons from "./ExportButtons";
 import StageTabs from "./StageTabs";
 import FiltersSheet from "./FiltersSheet";
-import { companyDisplay } from "@/lib/company";
+import { companyDisplay } from "@pmg/team-ui/lib/company";
 import { ownerFirstName, ownerOptions, parseOwnerFilter, OWNER_UNASSIGNED } from "@/lib/roleOwner";
 
 export const dynamic = "force-dynamic";

@@ -13,7 +13,7 @@ import {
   type ActivitySummary,
   type SummaryPeriod,
 } from "@/lib/activityFeed";
-import AttachmentChips from "../AttachmentChips";
+import AttachmentChips from "@pmg/team-ui/ui/AttachmentChips";
 
 // Activity Report — client half: the sticky filter bar (search · type chips ·
 // owner · date range · sort), the owner × type summary matrix (tracked team

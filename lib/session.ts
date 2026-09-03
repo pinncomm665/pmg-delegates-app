@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { supabaseServer } from "./supabaseServer";
+import { supabaseServer } from "@pmg/team-ui/lib/supabaseServer";
 
 export type AppUser = {
   id: string;

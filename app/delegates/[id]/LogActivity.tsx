@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useDialog } from "../../useDialog";
-import { useToast } from "../../Toast";
-import { NOTE_CHANNELS, NOTE_FILE_MAX_BYTES, fmtDuration, type NoteAttachment, type NoteChannel } from "@/lib/notes";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
+import { useToast } from "@pmg/team-ui/ui/Toast";
+import { NOTE_CHANNELS, NOTE_FILE_MAX_BYTES, fmtDuration, type NoteAttachment, type NoteChannel } from "@pmg/team-ui/lib/notes";
 import { logActivity } from "./actions";
 
 // "Log activity" — the quick action next to the stage pill. Three ways to log:

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseServer } from "@pmg/team-ui/lib/supabaseServer";
 import { requireUser } from "@/lib/session";
 
 export const dynamic = "force-dynamic";

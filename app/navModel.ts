@@ -1,4 +1,4 @@
-import type { NavItem } from "./NavLinks";
+import type { NavItem } from "@pmg/team-ui/ui/NavLinks";
 
 // Client-safe nav model (no server imports) shared by Sidebar (server) and
 // MobileNav (client). Shell.tsx resolves the groups once and hands them to both

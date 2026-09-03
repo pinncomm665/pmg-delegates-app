@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import type { ContactSummary } from "@/lib/contactSummary";
+import type { ContactSummary } from "@pmg/team-ui/lib/contactSummary";
 
 // AI summary card — sits directly under the detail-page header, above the tabs.
 // Server passes the current contact_summaries row (or null); this component

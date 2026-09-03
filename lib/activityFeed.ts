@@ -1,5 +1,5 @@
-import { supabaseAdmin } from "./supabaseAdmin";
-import { getAttachmentsForFeed, type NoteAttachment, type TranscriptStatus } from "./notes";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
+import { getAttachmentsForFeed, type NoteAttachment, type TranscriptStatus } from "@pmg/team-ui/lib/notes";
 import {
   ALL_OWNERS_PARAM,
   TRACKED_OWNERS,

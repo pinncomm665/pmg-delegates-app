@@ -3,18 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, requireAdmin, isReviewer, type AppUser } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { verifyEmail } from "@/lib/millionverifier";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
+import { verifyEmail } from "@pmg/team-ui/lib/millionverifier";
 import { getDelegate, getCompanyById, STAGE_VALUES, type DelegateRow } from "@/lib/data";
 import { canEdit, stageChangeNeedsReview, emailDomainMatches, SECURED_STAGES, NO_ACCESS_MSG } from "@/lib/policy";
 import { logChange, isRateGuarded, RATE_GUARD_MSG } from "@/lib/changes";
-import { companyDisplay } from "@/lib/company";
-import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
-import { normalizePhone } from "@/lib/phone";
-import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@/lib/textCase";
-import { cleanNameFields } from "@/lib/nameClean";
+import { companyDisplay } from "@pmg/team-ui/lib/company";
+import { canonicalizeLinkedinUrl, fullNameFrom, type FieldWriteResult } from "@pmg/team-ui/lib/contactFields";
+import { normalizePhone } from "@pmg/team-ui/lib/phone";
+import { titleCaseJobTitle, properCaseName, normalizeEmail } from "@pmg/team-ui/lib/textCase";
+import { cleanNameFields } from "@pmg/team-ui/lib/nameClean";
 import { ownerDisplayName } from "@/lib/roleOwner";
-import { insertContactNote, isNoteChannel, fmtDuration, hasVoiceAttachment, requestTranscription, type NoteAttachment, type NoteChannel } from "@/lib/notes";
+import { insertContactNote, isNoteChannel, fmtDuration, hasVoiceAttachment, requestTranscription, type NoteAttachment, type NoteChannel } from "@pmg/team-ui/lib/notes";
 
 async function loadContext(delegateId: string) {
   const d = await getDelegate(delegateId);

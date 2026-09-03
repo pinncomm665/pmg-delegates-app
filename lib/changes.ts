@@ -6,7 +6,7 @@
 // Logging must never break the user's write — errors are swallowed (and
 // surfaced in the server log).
 
-import { supabaseAdmin } from "./supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import type { AppUser } from "./session";
 import { RATE_GUARD_LIMIT, RATE_GUARD_WINDOW_MIN } from "./policy";
 

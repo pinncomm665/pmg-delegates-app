@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { supabaseServer } from "@pmg/team-ui/lib/supabaseServer";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") || "").trim();

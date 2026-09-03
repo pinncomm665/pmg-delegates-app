@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
-import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { NOTES_BUCKET, NOTE_FILE_MAX_BYTES, isAllowedNoteMime, notePath } from "@/lib/notes";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
+import { NOTES_BUCKET, NOTE_FILE_MAX_BYTES, isAllowedNoteMime, notePath } from "@pmg/team-ui/lib/notes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

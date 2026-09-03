@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import CallButton from "../CallButton";
-import { useDialog } from "../useDialog";
+import CallButton from "@pmg/team-ui/ui/CallButton";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Avatar from "../Avatar";
-import { useToast, looksLikeSessionExpired } from "../Toast";
+import Avatar from "@pmg/team-ui/ui/Avatar";
+import { useToast, looksLikeSessionExpired } from "@pmg/team-ui/ui/Toast";
 import { selectAllMatching } from "./actions";
 
 export type Row = {

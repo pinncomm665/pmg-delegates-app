@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ContactSummary, TimelineItem } from "@/lib/contactSummary";
-import { transcriptInFlight, type ContactNoteLite } from "@/lib/notes";
-import AttachmentChips from "../../AttachmentChips";
+import type { ContactSummary, TimelineItem } from "@pmg/team-ui/lib/contactSummary";
+import { transcriptInFlight, type ContactNoteLite } from "@pmg/team-ui/lib/notes";
+import AttachmentChips from "@pmg/team-ui/ui/AttachmentChips";
 
 // Activity timeline — the "Contact History" tab. Renders contact_summaries.timeline
 // (newest first, ≤ 40 items) from the SAME row the AI summary card uses, so it shares

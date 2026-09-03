@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import LinkedInIcon from "../../LinkedInIcon";
+import LinkedInIcon from "@pmg/team-ui/ui/LinkedInIcon";
 import { useRouter } from "next/navigation";
-import { useToast } from "../../Toast";
-import { emailStatusColors, type EmailStatus } from "@/lib/emailstatus";
-import { splitForEdit, fullNameFrom, type FieldWriteResult } from "@/lib/contactFields";
-import { formatPhone, PHONE_HINT_TEXT } from "@/lib/phone";
+import { useToast } from "@pmg/team-ui/ui/Toast";
+import { emailStatusColors, type EmailStatus } from "@pmg/team-ui/lib/emailstatus";
+import { splitForEdit, fullNameFrom, type FieldWriteResult } from "@pmg/team-ui/lib/contactFields";
+import { formatPhone, PHONE_HINT_TEXT } from "@pmg/team-ui/lib/phone";
 import { DetailRow, InlineEditor, PromoteIcon } from "./FieldEditor";
 import UpdateCompany from "./UpdateCompany";
-import CallButton from "../../CallButton";
+import CallButton from "@pmg/team-ui/ui/CallButton";
 import {
   updateName,
   updateJobTitle,

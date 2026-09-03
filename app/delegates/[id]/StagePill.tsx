@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast, looksLikeSessionExpired } from "../../Toast";
+import { useToast, looksLikeSessionExpired } from "@pmg/team-ui/ui/Toast";
 import { STAGES, STAGE_VALUES, stageBadgeClass, stageLabel } from "@/lib/data";
 
 // The status badge at the top-right of the delegate page, made editable: it

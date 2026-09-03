@@ -14,7 +14,8 @@
     "libphonenumber-js": "^1.13.11",
     "next": "^14.2.35",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "@pmg/team-ui": "github:pinncomm665/pmg-team-ui#v0.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.16.5",

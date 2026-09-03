@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useDialog } from "../useDialog";
+import { useDialog } from "@pmg/team-ui/ui/useDialog";
 
 // Layout island for the list page's filter <form>. ONE DOM for both shells —
 // the CSS in globals.css (.flt-*) decides what it looks like:

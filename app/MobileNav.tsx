@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import NavLinks from "./NavLinks";
+import NavLinks from "@pmg/team-ui/ui/NavLinks";
 import { NAV_SECTIONS, type NavGroups } from "./navModel";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';

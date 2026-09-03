@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "./supabaseAdmin";
+import { supabaseAdmin } from "@pmg/team-ui/lib/supabaseAdmin";
 import {
   buildSummit,
   CONFIRMED_STAGES,
@@ -616,8 +616,8 @@ export function stageBadgeClass(stage: string | null): string {
 // Per-contact AI summary (pmg-agent table contact_summaries). Degrades to null
 // when the table does not exist yet or the row is missing — the card handles
 // both; never throws into the page render.
-export type { ContactSummary } from "./contactSummary";
-export async function getContactSummary(contactId: string): Promise<import("./contactSummary").ContactSummary | null> {
+export type { ContactSummary } from "@pmg/team-ui/lib/contactSummary";
+export async function getContactSummary(contactId: string): Promise<import("@pmg/team-ui/lib/contactSummary").ContactSummary | null> {
   try {
     const sb = supabaseAdmin();
     const { data, error } = await sb
