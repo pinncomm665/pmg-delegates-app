@@ -803,3 +803,6 @@ a.att-chip:hover { color: var(--info); }
   .ar-owner { flex: 1 1 100%; }
   .ar-sort { flex: 1 1 auto; }
 }
+
+/* Pulse funnel rows (dashboard) — hover matches the roundtables app. */
+.funnel-row:hover { background: var(--hover, #f1efe8); }

@@ -34,6 +34,7 @@ export type ChangeStatus = "pending" | "auto_applied" | "approved" | "rejected";
 export type ChangeInput = {
   contact_id: string | null;
   delegate_id?: string | null;
+  speaker_id?: string | null;   // a role move touches both tables (kind 'role')
   event_id?: string | null;
   event_edition?: string | null;
   kind: ChangeKind;
@@ -76,6 +77,7 @@ export async function logChange(
   const { error } = await sb.from("contact_change_requests").insert({
     contact_id: input.contact_id,
     delegate_id: input.delegate_id ?? null,
+    speaker_id: input.speaker_id ?? null,
     event_id: input.event_id ?? null,
     event_edition: input.event_edition ?? null,
     kind: input.kind,

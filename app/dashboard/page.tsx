@@ -1,5 +1,7 @@
 import { requireUser } from "@/lib/session";
 import { getDashboard } from "@/lib/data";
+import { getFunnels } from "@/lib/funnel";
+import FunnelCards from "./FunnelCards";
 import { healthColors, healthLabel } from "@/lib/pulse";
 import Shell from "../Shell";
 import DashboardTable from "./DashboardTable";
@@ -35,6 +37,8 @@ function Metric({
 export default async function DashboardPage() {
   const user = await requireUser();
   const { summits, summary } = await getDashboard();
+  const funnels = await getFunnels(summits.map((s) => s.event_id));
+  const funnelItems = summits.map((s) => ({ name: s.name, funnel: funnels.get(s.event_id)! })).filter((x) => x.funnel);
   // Tiles are coloured by the portfolio's health band, not by sign.
   const band = healthColors(healthLabel(summary.avgHealthPct));
 
@@ -69,6 +73,8 @@ export default async function DashboardPage() {
       </div>
 
       <DashboardTable summits={summits} />
+
+      <FunnelCards items={funnelItems} />
     </Shell>
   );
 }

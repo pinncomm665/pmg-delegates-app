@@ -13,6 +13,8 @@ import Breadcrumb from "../../Breadcrumb";
 import { updateStatus, flagRole } from "./actions";
 import OwnerChip from "./OwnerChip";
 import StagePill from "./StagePill";
+import RoleChip, { RoleMovedToast } from "../../RoleChip";
+import { Suspense } from "react";
 import { ownerFirstName, ownerOptions } from "@/lib/roleOwner";
 import { emailStatusOf } from "@/lib/emailstatus";
 import ContactDetails from "./ContactDetails";
@@ -75,6 +77,7 @@ export default async function DelegateDetail({
           </Link>
         </div>
 
+        <Suspense fallback={null}><RoleMovedToast /></Suspense>
         {searchParams.flash && (
           <div
             className={`flash ${searchParams.flash === "ok" ? "flash-ok" : "flash-warn"}`}
@@ -107,6 +110,7 @@ export default async function DelegateDetail({
             </div>
             <div className="sp-head-actions">
               {c.id && <LogActivity delegateId={d.id} contactId={c.id} ret={ret} disabled={!editable} />}
+              <RoleChip id={d.id} name={c.full_name_clean ?? null} edition={d.event_edition ?? null} disabled={!editable} />
               <StagePill delegateId={d.id} stage={d.stage} disabled={!editable} />
               <OwnerChip
                 delegateId={d.id}
