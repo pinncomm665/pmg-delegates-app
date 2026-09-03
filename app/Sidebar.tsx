@@ -13,7 +13,6 @@ export const listItems: NavItem[] = [
 export function actionItems(user: AppUser): NavItem[] {
   return [
     { href: "/add-contact", label: "Add Contact" },
-    { href: "/my-changes", label: "My changes" },
     ...(isReviewer(user) ? [{ href: "/admin/queue", label: "Review queue" }] : []),
   ];
 }

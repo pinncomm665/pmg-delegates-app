@@ -6,7 +6,7 @@ import type { NavItem } from "./NavLinks";
 // roundtables and speakers apps — Lists / Actions / Reports.
 //
 //   Lists    → All delegates
-//   Actions  → Add Contact · My changes · Review queue (reviewer)
+//   Actions  → Add Contact · Review queue (reviewer)
 //   Reports  → Activity Report · Pulse dashboard
 //
 // The Pulse dashboard is also reached by clicking the app name.
