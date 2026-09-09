@@ -30,7 +30,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: var(--fs-md);
@@ -806,3 +806,60 @@ a.att-chip:hover { color: var(--info); }
 
 /* Pulse funnel rows (dashboard) — hover matches the roundtables app. */
 .funnel-row:hover { background: var(--hover, #f1efe8); }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TYPE SYSTEM (2026-09-09)
+
+   This app had no typeface decision at all — it rendered in whatever the OS
+   supplied, so the same screen looked different on a Mac, a Windows laptop and
+   an Android phone, and none of those matched the two apps that DID pick a
+   face. Inter is now loaded through next/font (self-hosted at build, no
+   runtime request to Google) and is the first entry in the stack below.
+
+   Eight steps, each carrying the line-height and letter-spacing it wants:
+   tracking tightens as size grows and loosens below body size, the correction
+   that stops small text reading as cramped and large text as loose. Weights are
+   optical instances (440/530/620) rather than 400/500/600 — Inter is loaded
+   variable, so these interpolate for real instead of being synthesised.
+
+   Utilities sit at the END of this file on purpose: `.t-sm` and `.badge` are
+   both single-class, so source order decides, and the explicit size must win.
+
+   Adopting these is opportunistic — existing rules keep their literals until a
+   file is open for other reasons. What matters today is that new work has one
+   scale to reach for instead of inventing a seventeenth size.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --text-2xs: 10px;   --text-2xs-lh: 14px; --text-2xs-ls: 0.01em;
+  --text-xs:  11px;   --text-xs-lh:  16px; --text-xs-ls:  0.01em;
+  --text-sm:  12px;   --text-sm-lh:  16px; --text-sm-ls:  0.01em;
+  --text-base:13px;   --text-base-lh:20px; --text-base-ls:0.014em;
+  --text-md:  14px;   --text-md-lh:  20px; --text-md-ls:  0.014em;
+  --text-lg:  15px;   --text-lg-lh:  20px; --text-lg-ls: -0.004em;
+  --text-xl:  18px;   --text-xl-lh:  24px; --text-xl-ls: -0.008em;
+  --text-2xl: 22px;   --text-2xl-lh: 28px; --text-2xl-ls:-0.008em;
+
+  --fw-normal: 440;
+  --fw-medium: 530;
+  --fw-semibold: 620;
+  --fw-bold: 700;
+
+  /* Three radii from the one knob already in this file, so a nested corner
+     stays concentric with its parent instead of being guessed. */
+  --radius-sm: max(calc(var(--radius) - 4px), 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+}
+.t-2xs  { font-size: var(--text-2xs);  line-height: var(--text-2xs-lh);  letter-spacing: var(--text-2xs-ls); }
+.t-xs   { font-size: var(--text-xs);   line-height: var(--text-xs-lh);   letter-spacing: var(--text-xs-ls); }
+.t-sm   { font-size: var(--text-sm);   line-height: var(--text-sm-lh);   letter-spacing: var(--text-sm-ls); }
+.t-base { font-size: var(--text-base); line-height: var(--text-base-lh); letter-spacing: var(--text-base-ls); }
+.t-md   { font-size: var(--text-md);   line-height: var(--text-md-lh);   letter-spacing: var(--text-md-ls); }
+.t-lg   { font-size: var(--text-lg);   line-height: var(--text-lg-lh);   letter-spacing: var(--text-lg-ls); }
+.t-xl   { font-size: var(--text-xl);   line-height: var(--text-xl-lh);   letter-spacing: var(--text-xl-ls); }
+.t-2xl  { font-size: var(--text-2xl);  line-height: var(--text-2xl-lh);  letter-spacing: var(--text-2xl-ls); }
+.fw-normal   { font-weight: var(--fw-normal); }
+.fw-medium   { font-weight: var(--fw-medium); }
+.fw-semibold { font-weight: var(--fw-semibold); }
+.fw-bold     { font-weight: var(--fw-bold); }
