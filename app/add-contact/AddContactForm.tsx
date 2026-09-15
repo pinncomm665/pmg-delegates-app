@@ -86,12 +86,16 @@ type IntakeRequest = {
 const BRANDS = ["10DX", "VERIFY", "4WARD", "PMG Roundtables"] as const;
 type Brand = (typeof BRANDS)[number];
 
-const ROLES = ["Delegate", "Speaker", "Sponsor", "Moderator", "Emcee", "Media", "VIP"] as const;
+// Sponsor-Speaker (pmg-agent mig 293) = a sponsor's representative who speaks:
+// ONE role — kept in the sales pipeline as a sponsor, listed on the programme
+// as a Sponsor-Speaker (never an editorial speaker).
+const ROLES = ["Delegate", "Speaker", "Sponsor", "Sponsor-Speaker", "Moderator", "Emcee", "Media", "VIP"] as const;
 type Role = (typeof ROLES)[number];
 
+const SPONSOR_SIDE: readonly Role[] = ["Sponsor", "Sponsor-Speaker"];
 // PMG Roundtables takes no sponsors (Syed, 2026-09-15) — every other role.
 const rolesFor = (brand: Brand | ""): readonly Role[] =>
-  brand === "PMG Roundtables" ? ROLES.filter((r) => r !== "Sponsor") : ROLES;
+  brand === "PMG Roundtables" ? ROLES.filter((r) => !SPONSOR_SIDE.includes(r)) : ROLES;
 
 // Progress card steps (the server does all three inside ONE request; the ticks
 // advance on a timer so the wait reads as progress, and all complete on reply).
@@ -300,7 +304,7 @@ export default function AddContactForm() {
   // Syed, 2026-09-15: no sponsor on a roundtable (pmg-agent
   // lib/events/sponsor-eligibility). rolesFor already hides Sponsor for PMG
   // Roundtables; this also catches a roundtable filed under a summit brand.
-  const sponsorBlocked = role === "Sponsor" && (brand === "PMG Roundtables" || !!selectedEvent?.client_roundtable);
+  const sponsorBlocked = !!role && SPONSOR_SIDE.includes(role) && (brand === "PMG Roundtables" || !!selectedEvent?.client_roundtable);
   // What still has to be picked before anything can be written.
   const missingPicks = [!brand && "brand", !eventId && "edition", !role && "role"].filter(Boolean) as string[];
   const picksReady = missingPicks.length === 0 && !sponsorBlocked;
@@ -664,7 +668,10 @@ export default function AddContactForm() {
             {rolesFor(brand).map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
           {brand === "PMG Roundtables" && (
-            <p className="help" style={{ marginTop: 4 }}>Roundtables take no sponsors, so Sponsor isn’t offered here.</p>
+            <p className="help" style={{ marginTop: 4 }}>Roundtables take no sponsors, so Sponsor and Sponsor-Speaker aren’t offered here.</p>
+          )}
+          {role === "Sponsor-Speaker" && (
+            <p className="help" style={{ marginTop: 4 }}>A sponsor’s representative who speaks — kept in the sales pipeline as a sponsor and listed on the programme as a Sponsor-Speaker.</p>
           )}
           {sponsorBlocked && brand !== "PMG Roundtables" && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
