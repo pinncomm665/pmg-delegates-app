@@ -88,7 +88,8 @@ type Brand = (typeof BRANDS)[number];
 
 // Sponsor-Speaker (pmg-agent mig 293) = a sponsor's representative who speaks:
 // ONE role — kept in the sales pipeline as a sponsor, listed on the programme
-// as a Sponsor-Speaker (never an editorial speaker).
+// as a Sponsor-Speaker (never an editorial speaker). CONFIRMED ONLY (mig 295):
+// picked only once the sponsor confirms them; never a prospect.
 const ROLES = ["Delegate", "Speaker", "Sponsor", "Sponsor-Speaker", "Moderator", "Emcee", "Media", "VIP"] as const;
 type Role = (typeof ROLES)[number];
 
@@ -671,7 +672,7 @@ export default function AddContactForm() {
             <p className="help" style={{ marginTop: 4 }}>Roundtables take no sponsors, so Sponsor and Sponsor-Speaker aren’t offered here.</p>
           )}
           {role === "Sponsor-Speaker" && (
-            <p className="help" style={{ marginTop: 4 }}>A sponsor’s representative who speaks — kept in the sales pipeline as a sponsor and listed on the programme as a Sponsor-Speaker.</p>
+            <p className="help" style={{ marginTop: 4 }}>Only once the sponsor has confirmed this person as its speaker — recorded as confirmed, kept in the sales pipeline as a sponsor and listed on the programme as a Sponsor-Speaker. Not for prospects: add a prospect as Sponsor.</p>
           )}
           {sponsorBlocked && brand !== "PMG Roundtables" && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
