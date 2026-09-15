@@ -1,5 +1,32 @@
 "use client";
 
+// ════════════════════════════════════════════════════════════════════════════
+// UNIVERSAL ADD CONTACT — MASTER COPY
+//
+// This file is IDENTICAL, byte for byte, in the delegates, speakers and
+// roundtables apps (Syed, 2026-09-15: one button, one function, one format —
+// the three apps are due to merge into one). Change it in one app, then copy
+// it unchanged to the other two.
+//
+// Nothing app-specific belongs in this file. What differs per app lives in
+// that app's server routes:
+//   /api/intake-locate — where "Open record" goes in this app
+//   /api/intake-attach — may also write this app's activity log
+// The sales app keeps its own copy with the same rules plus what only sales
+// needs (the restricted view, prefill from a deal or company page).
+//
+// The rules, in every app:
+//   · LinkedIn URL only — the server pulls name, title and company.
+//   · Brand, edition and role are REQUIRED picks. Nothing is preselected: a
+//     default is how contacts were silently mis-tagged (e.g. everything
+//     landing in "10DX Kenya 2027").
+//   · An exact LinkedIn match blocks a new record; the existing one can be
+//     added to the chosen edition instead. There is no "add anyway": the same
+//     LinkedIn URL is the same person.
+//   · A same-name-same-company match is shown first; submitting anyway sends
+//     it to review, never straight in.
+// ════════════════════════════════════════════════════════════════════════════
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
@@ -37,7 +64,9 @@ type SubmitOutcome =
 // Where a CRM contact lives in THIS app (see /api/intake-locate).
 type Locate = { href: string | null; kind?: string; edition?: string | null; role_id?: string | null };
 
-type EventOption = { id: string; name: string };
+// One row of the Edition select (see /api/intake-events). client_roundtable:
+// a single client's roundtable — no sponsor can be recorded against it.
+type EventOption = { id: string; name: string; client_roundtable?: boolean };
 
 type IntakeRequest = {
   id: string;
@@ -57,8 +86,6 @@ type Brand = (typeof BRANDS)[number];
 
 const ROLES = ["Delegate", "Speaker", "Sponsor", "Moderator", "Emcee", "Media", "VIP"] as const;
 type Role = (typeof ROLES)[number];
-
-const PMG_ROUNDTABLES_EVENT_ID = "ca27bd35-0993-442c-9b47-bc84a2f39991";
 
 // Progress card steps (the server does all three inside ONE request; the ticks
 // advance on a timer so the wait reads as progress, and all complete on reply).
@@ -111,11 +138,11 @@ function Person({ c }: { c: { full_name_clean?: string | null; job_title?: strin
 export default function AddContactForm() {
   const router = useRouter();
 
-  // Form fields
+  // Form fields — all three selects start empty on purpose (see header).
   const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [brand, setBrand] = useState<Brand>("10DX");
+  const [brand, setBrand] = useState<Brand | "">("");
   const [eventId, setEventId] = useState<string>("");
-  const [role, setRole] = useState<Role>("Delegate");
+  const [role, setRole] = useState<Role | "">("");
   const [note, setNote] = useState("");
 
   // Duplicate check state
@@ -133,6 +160,7 @@ export default function AddContactForm() {
   // Edition list
   const [events, setEvents] = useState<EventOption[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState(false);
 
   // Submit / holding pattern
   const [phase, setPhase] = useState<"form" | "working" | "done">("form");
@@ -142,6 +170,8 @@ export default function AddContactForm() {
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<SubmitOutcome | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // The edition + role the last add went to (the form resets after a success).
+  const [doneWhere, setDoneWhere] = useState<{ edition: string; role: string } | null>(null);
 
   // My submissions
   const [submissions, setSubmissions] = useState<IntakeRequest[]>([]);
@@ -156,7 +186,7 @@ export default function AddContactForm() {
       const res = await fetch("/api/my-intake");
       if (res.ok) {
         const data = await res.json();
-        setSubmissions(Array.isArray(data.requests) ? data.requests : []);
+        setSubmissions(Array.isArray(data.requests) ? data.requests : Array.isArray(data) ? data : []);
       }
     } catch {
       // non-critical
@@ -168,19 +198,25 @@ export default function AddContactForm() {
 
   // ── Fetch editions when brand changes ──────────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
     setEventId("");
+    setEvents([]);
+    setEventsError(false);
+    if (!brand) return;
+    // Stale-response guard: rapid brand switches can resolve out of order.
+    let cancelled = false;
     setEventsLoading(true);
     fetch(`/api/intake-events?brand=${encodeURIComponent(brand)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((data) => {
         if (cancelled) return;
-        const raw: any[] = Array.isArray(data.events) ? data.events : Array.isArray(data) ? data : [];
-        const list: EventOption[] = raw.map((e) => ({ id: String(e.id), name: String(e.name ?? e.edition_name ?? "") }));
-        setEvents(list);
-        setEventId(list.length > 0 ? list[0].id : "");
+        const raw: any[] = Array.isArray(data?.events) ? data.events : [];
+        setEvents(raw.map((e) => ({ id: String(e.id), name: String(e.name ?? ""), client_roundtable: e.client_roundtable === true })));
+        if (data?.error) setEventsError(true);
       })
-      .catch(() => { if (!cancelled) setEvents([]); })
+      .catch(() => { if (!cancelled) { setEvents([]); setEventsError(true); } })
       .finally(() => { if (!cancelled) setEventsLoading(false); });
     return () => { cancelled = true; };
   }, [brand]);
@@ -248,8 +284,14 @@ export default function AddContactForm() {
   };
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  const resolvedEventId = eventId || (brand === "PMG Roundtables" ? PMG_ROUNDTABLES_EVENT_ID : undefined);
-  const editionLabel = () => events.find((e) => e.id === eventId)?.name ?? "the selected edition";
+  const selectedEvent = events.find((e) => e.id === eventId);
+  const editionLabel = () => selectedEvent?.name ?? "the selected edition";
+  // Syed, 2026-09-15: a client roundtable is sold to that one client, so no
+  // sponsor can be associated with it (pmg-agent lib/events/sponsor-eligibility).
+  const sponsorBlocked = role === "Sponsor" && !!selectedEvent?.client_roundtable;
+  // What still has to be picked before anything can be written.
+  const missingPicks = [!brand && "brand", !eventId && "edition", !role && "role"].filter(Boolean) as string[];
+  const picksReady = missingPicks.length === 0 && !sponsorBlocked;
 
   const startWorking = (name: string | null, what: "add" | "attach") => {
     setWorkingName(name);
@@ -267,6 +309,8 @@ export default function AddContactForm() {
   };
   useEffect(() => () => stopWorking(), []);
 
+  // Brand, edition and role stay as they were — the next person is usually
+  // for the same edition. Only the person-specific fields clear.
   const resetForm = () => {
     setLinkedinUrl("");
     setNote("");
@@ -274,22 +318,22 @@ export default function AddContactForm() {
   };
 
   // Land on the new/attached record with a flash message, or fall back to an
-  // in-place success card when it isn't visible in this app.
+  // in-place success card when it has no page in this app.
   const landOnRecord = async (contactId: string, name: string | null, verb: string): Promise<boolean> => {
-    const l = await locate(contactId, { event_id: resolvedEventId, participant_type: role });
+    const l = await locate(contactId, { event_id: eventId, participant_type: role });
     if (!l.href) return false;
-    const ed = l.edition ?? editionLabel();
-    const msg = `${verb} — ${name ?? "Contact"} added to ${ed} as ${role}`;
+    const msg = `${verb} — ${name ?? "Contact"} added to ${l.edition ?? editionLabel()} as ${role}`;
     router.push(`${l.href}?flash=ok&msg=${encodeURIComponent(msg)}`);
     return true;
   };
 
   // ── Submit (new contact) ───────────────────────────────────────────────────
-  const submit = async (opts?: { forceNew?: boolean }) => {
-    if (busy) return;
-    if (checkState.status === "dup" && !opts?.forceNew) return;
+  const submit = async () => {
+    if (busy || !picksReady) return;
+    if (checkState.status === "dup") return; // hard stop — use the existing record
     setBusy(true);
     startWorking(null, "add");
+    setDoneWhere({ edition: editionLabel(), role });
     try {
       const res = await fetch("/api/intake-submit", {
         method: "POST",
@@ -297,10 +341,9 @@ export default function AddContactForm() {
         body: JSON.stringify({
           linkedin_url: linkedinUrl.trim(),
           event_brand: brand,
-          event_id: resolvedEventId,
+          event_id: eventId,
           participant_type: role,
           note: note.trim() || undefined,
-          ...(opts?.forceNew ? { force_new: true } : {}),
         }),
       });
       const data: SubmitOutcome | { error?: string } | null = await res.json().catch(() => null);
@@ -350,10 +393,11 @@ export default function AddContactForm() {
 
   // ── Attach an existing contact to the chosen edition + role ───────────────
   const attach = async (contact: { id: string; full_name_clean?: string | null }) => {
-    if (busy) return;
+    if (busy || !picksReady) return;
     setBusy(true);
     startWorking(contact.full_name_clean ?? null, "attach");
     setStepDone(2); // nothing to pull/check — only the role row is created
+    setDoneWhere({ edition: editionLabel(), role });
     try {
       const res = await fetch("/api/intake-attach", {
         method: "POST",
@@ -361,7 +405,7 @@ export default function AddContactForm() {
         body: JSON.stringify({
           contact_id: contact.id,
           event_brand: brand,
-          event_id: resolvedEventId,
+          event_id: eventId,
           participant_type: role,
         }),
       });
@@ -391,8 +435,13 @@ export default function AddContactForm() {
 
   // ── Derived flags ──────────────────────────────────────────────────────────
   const isDup = checkState.status === "dup";
-  const needsEvent = !eventId;
-  const submitDisabled = busy || isDup || !linkedinUrl.trim() || checkState.status === "checking" || needsEvent;
+  const submitDisabled = busy || isDup || !linkedinUrl.trim() || checkState.status === "checking" || !picksReady;
+  const picksHint =
+    missingPicks.length > 0
+      ? `Pick the ${missingPicks.join(", ").replace(/, ([^,]*)$/, " and $1")} below to enable this.`
+      : sponsorBlocked
+      ? "A client roundtable can’t have a sponsor — pick another role or edition."
+      : null;
 
   // ── "Open record" control for a matched contact ───────────────────────────
   const OpenRecord = ({ id }: { id: string }) => {
@@ -406,8 +455,8 @@ export default function AddContactForm() {
       );
     }
     return (
-      <button type="button" className="btn btn-sm" disabled title="This person is in the CRM but holds no delegate seat visible in this app">
-        Exists in CRM (no delegate seat)
+      <button type="button" className="btn btn-sm" disabled title="This person is in the CRM but has no page you can open in this app">
+        In CRM · no page in this app
       </button>
     );
   };
@@ -458,7 +507,7 @@ export default function AddContactForm() {
                 </div>
               )}
               <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
-                Added to {editionLabel()} as {role}. That record isn’t shown in this app, so there’s no page to open here.
+                Added to {doneWhere?.edition ?? "the edition"} as {doneWhere?.role ?? "selected role"}. There’s no page for it in this app.
               </p>
             </div>
           )}
@@ -467,6 +516,12 @@ export default function AddContactForm() {
               <div style={{ fontWeight: 600, color: "var(--warn)", marginBottom: 4 }}>Saved for review — {reviewReason(outcome.gates, outcome.reason)}</div>
               <p style={{ fontSize: 13, margin: 0 }}>
                 Syed will approve, merge, or reject it. Track it under <a href="#my-submissions">My Submissions</a>.
+                {Array.isArray(outcome.duplicate_candidates) && outcome.duplicate_candidates.length > 0 && (
+                  <>
+                    {" "}{outcome.duplicate_candidates.length} possible match{outcome.duplicate_candidates.length === 1 ? "" : "es"} already
+                    in the CRM will be checked first — no need to re-submit.
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -507,29 +562,26 @@ export default function AddContactForm() {
           )}
         </div>
 
-        {/* Exact match callout */}
+        {/* Exact LinkedIn match — blocks a new record */}
         {checkState.status === "dup" && (
           <div className="card section" role="alert" style={{ borderColor: "#e8b4b4", background: "#fff5f5" }}>
-            <div style={{ color: "#c0392b", fontWeight: 600, fontSize: 13, marginBottom: 6 }}>This person may already be in the CRM</div>
+            <div style={{ color: "#c0392b", fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Already in the CRM</div>
             <Person c={checkState.contact} />
             {(checkState.contact.event_brand || checkState.contact.participant_type) && (
               <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                 {[checkState.contact.event_brand, checkState.contact.participant_type].filter(Boolean).join(" › ")}
               </div>
             )}
+            <p style={{ fontSize: 13, color: "#c0392b", margin: "8px 0 0" }}>
+              A new record can’t be created for the same LinkedIn profile — add this one to the edition instead.
+            </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12, alignItems: "center" }}>
               <OpenRecord id={checkState.contact.id} />
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => attach(checkState.contact)} disabled={busy || needsEvent}>
-                Add to this edition instead · as {role}
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => attach(checkState.contact)} disabled={busy || !picksReady}>
+                {picksReady ? `Add to ${editionLabel()} · as ${role}` : "Add to the edition instead"}
               </button>
             </div>
-            <div style={{ marginTop: 10 }}>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => submit({ forceNew: true })} disabled={busy || needsEvent}>
-                Not the same person — add anyway
-              </button>
-              <p className="help" style={{ marginTop: 4 }}>Creates a separate new record. Use only when you’re sure it’s a different person.</p>
-            </div>
-            {needsEvent && <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Select an edition below to enable these.</p>}
+            {picksHint && <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{picksHint}</p>}
           </div>
         )}
 
@@ -548,34 +600,46 @@ export default function AddContactForm() {
                   <div style={{ minWidth: 160 }}><Person c={m} /></div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                     <OpenRecord id={m.id} />
-                    <button type="button" className="btn btn-sm" onClick={() => attach(m)} disabled={busy || needsEvent}>Attach instead</button>
+                    <button type="button" className="btn btn-sm" onClick={() => attach(m)} disabled={busy || !picksReady}>Attach instead</button>
                   </div>
                 </div>
               ))}
             </div>
-            <p className="help" style={{ marginTop: 8 }}>Not them? Just submit below — a new record is created.</p>
+            <p className="help" style={{ marginTop: 8 }}>
+              Not them? Submit below — because of the match, a reviewer checks it before it’s added.
+            </p>
+            {picksHint && <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{picksHint}</p>}
           </div>
         )}
 
         {/* Brand select */}
         <div>
           <label htmlFor="brand">Brand</label>
-          <select id="brand" value={brand} onChange={(e) => setBrand(e.target.value as Brand)}>
+          <select id="brand" value={brand} onChange={(e) => setBrand(e.target.value as Brand | "")}>
+            <option value="">Select brand…</option>
             {BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
 
-        {/* Edition select */}
+        {/* Edition select — for PMG Roundtables this lists the roundtables themselves */}
         <div>
-          <label htmlFor="event_id">Edition</label>
-          <select id="event_id" value={eventId} onChange={(e) => setEventId(e.target.value)} disabled={eventsLoading}>
-            {eventsLoading && <option value="">Loading…</option>}
-            {!eventsLoading && events.length === 0 && <option value="">No editions found</option>}
-            {!eventsLoading && events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
+          <label htmlFor="event_id">{brand === "PMG Roundtables" ? "Roundtable" : "Edition"}</label>
+          <select id="event_id" value={eventId} onChange={(e) => setEventId(e.target.value)} disabled={!brand || eventsLoading}>
+            {!brand && <option value="">Select a brand first</option>}
+            {brand && eventsLoading && <option value="">Loading…</option>}
+            {brand && !eventsLoading && events.length === 0 && <option value="">No upcoming editions</option>}
+            {brand && !eventsLoading && events.length > 0 && (
+              <option value="">{brand === "PMG Roundtables" ? "Select roundtable…" : "Select edition…"}</option>
+            )}
+            {brand && !eventsLoading && events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
           </select>
-          {!eventsLoading && events.length === 0 && (
+          {brand && !eventsLoading && events.length === 0 && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Couldn’t load editions for this brand — submission is disabled until an edition can be selected.
+              {eventsError
+                ? "Couldn’t load editions — reload the page to try again."
+                : brand === "PMG Roundtables"
+                ? "No upcoming roundtable you can add to (roundtables are limited to your markets)."
+                : "No upcoming edition for this brand."}
             </p>
           )}
         </div>
@@ -583,9 +647,15 @@ export default function AddContactForm() {
         {/* Role select */}
         <div>
           <label htmlFor="role">Role</label>
-          <select id="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+          <select id="role" value={role} onChange={(e) => setRole(e.target.value as Role | "")}>
+            <option value="">Select role…</option>
             {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
+          {sponsorBlocked && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
+              {editionLabel()} is a client roundtable — it’s sold to that one client, so no sponsor can be added to it.
+            </p>
+          )}
         </div>
 
         {/* Optional note */}
