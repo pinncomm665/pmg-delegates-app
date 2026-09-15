@@ -25,6 +25,8 @@
 //     LinkedIn URL is the same person.
 //   · A same-name-same-company match is shown first; submitting anyway sends
 //     it to review, never straight in.
+//   · PMG Roundtables takes no sponsors (Syed, 2026-09-15): the Sponsor role is
+//     not offered for that brand. Every other role is.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -86,6 +88,10 @@ type Brand = (typeof BRANDS)[number];
 
 const ROLES = ["Delegate", "Speaker", "Sponsor", "Moderator", "Emcee", "Media", "VIP"] as const;
 type Role = (typeof ROLES)[number];
+
+// PMG Roundtables takes no sponsors (Syed, 2026-09-15) — every other role.
+const rolesFor = (brand: Brand | ""): readonly Role[] =>
+  brand === "PMG Roundtables" ? ROLES.filter((r) => r !== "Sponsor") : ROLES;
 
 // Progress card steps (the server does all three inside ONE request; the ticks
 // advance on a timer so the wait reads as progress, and all complete on reply).
@@ -196,6 +202,11 @@ export default function AddContactForm() {
   }, []);
   useEffect(() => { loadSubmissions(); }, [loadSubmissions]);
 
+  // A role the chosen brand does not take is cleared, never kept silently.
+  useEffect(() => {
+    if (role && !rolesFor(brand).includes(role)) setRole("");
+  }, [brand, role]);
+
   // ── Fetch editions when brand changes ──────────────────────────────────────
   useEffect(() => {
     setEventId("");
@@ -286,9 +297,10 @@ export default function AddContactForm() {
   // ── Helpers ────────────────────────────────────────────────────────────────
   const selectedEvent = events.find((e) => e.id === eventId);
   const editionLabel = () => selectedEvent?.name ?? "the selected edition";
-  // Syed, 2026-09-15: a client roundtable is sold to that one client, so no
-  // sponsor can be associated with it (pmg-agent lib/events/sponsor-eligibility).
-  const sponsorBlocked = role === "Sponsor" && !!selectedEvent?.client_roundtable;
+  // Syed, 2026-09-15: no sponsor on a roundtable (pmg-agent
+  // lib/events/sponsor-eligibility). rolesFor already hides Sponsor for PMG
+  // Roundtables; this also catches a roundtable filed under a summit brand.
+  const sponsorBlocked = role === "Sponsor" && (brand === "PMG Roundtables" || !!selectedEvent?.client_roundtable);
   // What still has to be picked before anything can be written.
   const missingPicks = [!brand && "brand", !eventId && "edition", !role && "role"].filter(Boolean) as string[];
   const picksReady = missingPicks.length === 0 && !sponsorBlocked;
@@ -440,7 +452,7 @@ export default function AddContactForm() {
     missingPicks.length > 0
       ? `Pick the ${missingPicks.join(", ").replace(/, ([^,]*)$/, " and $1")} below to enable this.`
       : sponsorBlocked
-      ? "A client roundtable can’t have a sponsor — pick another role or edition."
+      ? "A roundtable can’t have a sponsor — pick another role or edition."
       : null;
 
   // ── "Open record" control for a matched contact ───────────────────────────
@@ -649,11 +661,14 @@ export default function AddContactForm() {
           <label htmlFor="role">Role</label>
           <select id="role" value={role} onChange={(e) => setRole(e.target.value as Role | "")}>
             <option value="">Select role…</option>
-            {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {rolesFor(brand).map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
-          {sponsorBlocked && (
+          {brand === "PMG Roundtables" && (
+            <p className="help" style={{ marginTop: 4 }}>Roundtables take no sponsors, so Sponsor isn’t offered here.</p>
+          )}
+          {sponsorBlocked && brand !== "PMG Roundtables" && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
-              {editionLabel()} is a client roundtable — it’s sold to that one client, so no sponsor can be added to it.
+              {editionLabel()} is a roundtable — no sponsor can be added to it.
             </p>
           )}
         </div>

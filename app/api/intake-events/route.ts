@@ -5,8 +5,8 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const dynamic = "force-dynamic";
 
 // ════════════════════════════════════════════════════════════════════════════
-// UNIVERSAL ADD CONTACT — MASTER COPY. Identical in the delegates, speakers
-// and roundtables apps; change one, copy it to the other two.
+// UNIVERSAL ADD CONTACT — MASTER COPY. Identical in the delegates, speakers,
+// roundtables AND sales apps; change one, copy it to the other three.
 //
 // GET ?brand=<brand> → { events: [{ id, name, client_roundtable }] } for the
 // Add Contact Edition select.
@@ -15,8 +15,9 @@ export const dynamic = "force-dynamic";
 //     roundtables (they are listed under PMG Roundtables, never twice).
 //   · PMG Roundtables: every roundtable, whichever brand the registry files it
 //     under (the intake server accepts a roundtable edition under the "PMG
-//     Roundtables" umbrella). The brand-level portfolio row is NOT offered here
-//     — it is where sponsor prospecting lives, which is the sales app's job.
+//     Roundtables" umbrella). The brand-level portfolio row is never offered:
+//     it was a bucket for roundtable sponsor prospects, and PMG Roundtables
+//     takes no sponsors (Syed, 2026-09-15). People go on a real roundtable.
 //   · Active and not yet run (dateless rows kept — we cannot prove they ran).
 //     Alphabetical: a picker is scanned by name (Syed, 2026-09-04).
 //   · A user stamped with app_metadata.rt_markets sees only the roundtables
