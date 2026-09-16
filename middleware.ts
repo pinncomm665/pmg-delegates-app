@@ -54,6 +54,29 @@ export async function middleware(request: NextRequest) {
   // unauthorized users are sent to the hub instead of the local /login page.
   const hubUrl = process.env.HUB_URL;
 
+  // Parked accounts (app_metadata.maintenance = true on the user). Enforced
+  // HERE rather than in a layout because a layout only guards page renders: an
+  // /api route has no layout, and a server action has already RUN by the time
+  // one renders. Every request passes through middleware, so this is the one
+  // place that can mean "no data in any form" (Syed, 2026-09-16). Flipping the
+  // flag parks/lifts the account on its next request — no deploy.
+  if (
+    user &&
+    (user.app_metadata as { maintenance?: boolean } | null)?.maintenance === true
+  ) {
+    const isServerAction =
+      request.method === "POST" && request.headers.has("next-action");
+    if (path.startsWith("/api/") || isServerAction) {
+      return NextResponse.json(
+        { error: "Site under maintenance" },
+        { status: 403 }
+      );
+    }
+    if (path !== "/maintenance") {
+      return NextResponse.redirect(new URL("/maintenance", request.url));
+    }
+  }
+
   if (!user && !isAuthRoute) {
     if (hubUrl) {
       // Behind Railway's proxy request.url resolves to the internal host
