@@ -25,8 +25,10 @@
 //     LinkedIn URL is the same person.
 //   · A same-name-same-company match is shown first; submitting anyway sends
 //     it to review, never straight in.
-//   · PMG Roundtables takes no sponsors (Syed, 2026-09-15): the Sponsor role is
-//     not offered for that brand. Every other role is.
+//   · No individual is recorded as a sponsor on a roundtable (Syed, clarified
+//     2026-09-19): roundtable participants are delegates/speakers, so the
+//     Sponsor and Sponsor-Speaker roles are not offered for PMG Roundtables.
+//     Every other role is. Company-level roundtable sponsorship is a deal.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -67,7 +69,7 @@ type SubmitOutcome =
 type Locate = { href: string | null; kind?: string; edition?: string | null; role_id?: string | null };
 
 // One row of the Edition select (see /api/intake-events). client_roundtable:
-// a single client's roundtable — no sponsor can be recorded against it.
+// a single client's roundtable — no individual can be added to it as a sponsor.
 type EventOption = { id: string; name: string; client_roundtable?: boolean };
 
 type IntakeRequest = {
@@ -94,7 +96,9 @@ const ROLES = ["Delegate", "Speaker", "Sponsor", "Sponsor-Speaker", "Moderator",
 type Role = (typeof ROLES)[number];
 
 const SPONSOR_SIDE: readonly Role[] = ["Sponsor", "Sponsor-Speaker"];
-// PMG Roundtables takes no sponsors (Syed, 2026-09-15) — every other role.
+// (Syed, clarified 2026-09-19): no individual is recorded as a sponsor on a
+// roundtable; participants are delegates/speakers; company-level roundtable
+// sponsorship is a deal. So PMG Roundtables gets every role but the sponsor side.
 const rolesFor = (brand: Brand | ""): readonly Role[] =>
   brand === "PMG Roundtables" ? ROLES.filter((r) => !SPONSOR_SIDE.includes(r)) : ROLES;
 
@@ -302,9 +306,11 @@ export default function AddContactForm() {
   // ── Helpers ────────────────────────────────────────────────────────────────
   const selectedEvent = events.find((e) => e.id === eventId);
   const editionLabel = () => selectedEvent?.name ?? "the selected edition";
-  // Syed, 2026-09-15: no sponsor on a roundtable (pmg-agent
-  // lib/events/sponsor-eligibility). rolesFor already hides Sponsor for PMG
-  // Roundtables; this also catches a roundtable filed under a summit brand.
+  // (Syed, clarified 2026-09-19): no individual is recorded as a sponsor on a
+  // roundtable; participants are delegates/speakers; company-level roundtable
+  // sponsorship is a deal (pmg-agent lib/events/sponsor-eligibility). rolesFor
+  // already hides Sponsor for PMG Roundtables; this also catches a roundtable
+  // filed under a summit brand.
   const sponsorBlocked = !!role && SPONSOR_SIDE.includes(role) && (brand === "PMG Roundtables" || !!selectedEvent?.client_roundtable);
   // What still has to be picked before anything can be written.
   const missingPicks = [!brand && "brand", !eventId && "edition", !role && "role"].filter(Boolean) as string[];
@@ -457,7 +463,7 @@ export default function AddContactForm() {
     missingPicks.length > 0
       ? `Pick the ${missingPicks.join(", ").replace(/, ([^,]*)$/, " and $1")} below to enable this.`
       : sponsorBlocked
-      ? "A roundtable can’t have a sponsor — pick another role or edition."
+      ? "A person can’t be added to a roundtable as a sponsor — pick another role or edition."
       : null;
 
   // ── "Open record" control for a matched contact ───────────────────────────
@@ -669,14 +675,14 @@ export default function AddContactForm() {
             {rolesFor(brand).map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
           {brand === "PMG Roundtables" && (
-            <p className="help" style={{ marginTop: 4 }}>Roundtables take no sponsors, so Sponsor and Sponsor-Speaker aren’t offered here.</p>
+            <p className="help" style={{ marginTop: 4 }}>Roundtable participants are delegates and speakers, so Sponsor and Sponsor-Speaker aren’t offered here. A company sponsoring a roundtable is tracked as a deal in Sales CRM.</p>
           )}
           {role === "Sponsor-Speaker" && (
             <p className="help" style={{ marginTop: 4 }}>Only once the sponsor has confirmed this person as its speaker — recorded as confirmed, kept in the sales pipeline as a sponsor and listed on the programme as a Sponsor-Speaker. Not for prospects: add a prospect as Sponsor.</p>
           )}
           {sponsorBlocked && brand !== "PMG Roundtables" && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
-              {editionLabel()} is a roundtable — no sponsor can be added to it.
+              {editionLabel()} is a roundtable — a person can’t be added to it as a sponsor.
             </p>
           )}
         </div>
