@@ -16,8 +16,10 @@ export const dynamic = "force-dynamic";
 //   · PMG Roundtables: every roundtable, whichever brand the registry files it
 //     under (the intake server accepts a roundtable edition under the "PMG
 //     Roundtables" umbrella). The brand-level portfolio row is never offered:
-//     it was a bucket for roundtable sponsor prospects, and PMG Roundtables
-//     takes no sponsors (Syed, 2026-09-15). People go on a real roundtable.
+//     it was a bucket for roundtable sponsor prospects, and no individual is
+//     recorded as a sponsor on a roundtable (Syed, clarified 2026-09-19):
+//     participants are delegates/speakers; company-level roundtable
+//     sponsorship is a deal. People go on a real roundtable.
 //   · Active and not yet run (dateless rows kept — we cannot prove they ran).
 //     Alphabetical: a picker is scanned by name (Syed, 2026-09-04).
 //   · A user stamped with app_metadata.rt_markets sees only the roundtables
