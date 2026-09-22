@@ -6,6 +6,7 @@ import AISummary from "./AISummary";
 import ActivityTimeline from "./ActivityTimeline";
 import ProfileTabs from "./ProfileTabs";
 import { companyDisplay } from "@/lib/company";
+import { normalizeBrand } from "@/lib/brands";
 import RegistrationForm from "./RegistrationForm";
 import Avatar from "../../Avatar";
 import Shell from "../../Shell";
@@ -102,7 +103,7 @@ export default async function DelegateDetail({
                 {c.job_title ?? "—"} · {companyDisplay(c.company?.name ?? c.company_name_submitted) ?? "—"}
               </p>
               <p className="muted" style={{ margin: "2px 0 0", fontSize: 13 }}>
-                {d.event_brand && <strong>{d.event_brand}</strong>}
+                {d.event_brand && <strong>{normalizeBrand(d.event_brand)}</strong>}
                 {d.event_brand && d.event_edition ? " › " : ""}
                 {d.event_edition ?? ""}
               </p>

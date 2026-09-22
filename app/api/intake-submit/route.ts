@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
   }
 
   const { submitted_by: _a, submitted_by_email: _b, force_new: _c, ...rest } = clientBody as Record<string, unknown>;
+  // "PMG Roundtables" was renamed PeerRoom (2026-09-22). A browser tab still
+  // running the old form bundle may send the legacy name — write the new one.
+  // (pmg-agent accepts both, but the apps send the canonical value.)
+  if (typeof rest.event_brand === "string" && /^pmg roundtables?$/i.test(rest.event_brand.trim())) rest.event_brand = "PeerRoom";
   const payload = { ...rest, submitted_by: user.id, submitted_by_email: user.email ?? null };
 
   try {

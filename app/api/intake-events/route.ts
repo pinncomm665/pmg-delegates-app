@@ -12,10 +12,12 @@ export const dynamic = "force-dynamic";
 // Add Contact Edition select.
 //
 //   · Summit brands (10DX / VERIFY / 4WARD): that brand's editions, minus its
-//     roundtables (they are listed under PMG Roundtables, never twice).
-//   · PMG Roundtables: every roundtable, whichever brand the registry files it
-//     under (the intake server accepts a roundtable edition under the "PMG
-//     Roundtables" umbrella). The brand-level portfolio row is never offered:
+//     roundtables (they are listed under PeerRoom, never twice).
+//   · PeerRoom (renamed from "PMG Roundtables" on 2026-09-22): every
+//     roundtable, whichever brand the registry files it under (the intake
+//     server accepts a roundtable edition under the PeerRoom umbrella). A
+//     legacy ?brand=PMG Roundtables (stale form bundle) is read as PeerRoom.
+//     The brand-level portfolio row is never offered:
 //     it was a bucket for roundtable sponsor prospects, and no individual is
 //     recorded as a sponsor on a roundtable (Syed, clarified 2026-09-19):
 //     participants are delegates/speakers; company-level roundtable
@@ -28,8 +30,15 @@ export const dynamic = "force-dynamic";
 //     editions are never narrowed.
 // ════════════════════════════════════════════════════════════════════════════
 
-const BRANDS = ["10DX", "VERIFY", "4WARD", "PMG Roundtables"];
-const PORTFOLIO_EDITION = "PMG Roundtables";
+const ROUNDTABLE_BRAND = "PeerRoom";
+const BRANDS = ["10DX", "VERIFY", "4WARD", ROUNDTABLE_BRAND];
+// The standing holding edition (ca27bd35-0993-442c-9b47-bc84a2f39991) — its
+// edition_name is "PeerRoom" after the rename, "PMG Roundtables" before it.
+const PORTFOLIO_EVENT_ID = "ca27bd35-0993-442c-9b47-bc84a2f39991";
+const PORTFOLIO_EDITIONS = ["PeerRoom", "PMG Roundtables"];
+const isPortfolio = (r: { id: string; edition_name: string | null }) =>
+  r.id === PORTFOLIO_EVENT_ID || PORTFOLIO_EDITIONS.includes(r.edition_name ?? "");
+const canonBrand = (b: string) => (/^pmg roundtables?$/i.test(b.trim()) ? ROUNDTABLE_BRAND : b);
 
 type Row = { id: string; brand: string | null; edition_name: string | null; format: string | null };
 
@@ -48,7 +57,7 @@ function parseMarkets(appMeta: any, userMeta: any): string[] | null {
 
 export async function GET(request: NextRequest) {
   const user = await requireUser();
-  const brand = new URL(request.url).searchParams.get("brand") ?? "";
+  const brand = canonBrand(new URL(request.url).searchParams.get("brand") ?? "");
   if (!BRANDS.includes(brand)) return NextResponse.json({ events: [] });
 
   const sb = supabaseAdmin();
@@ -60,18 +69,18 @@ export async function GET(request: NextRequest) {
     .not("edition_name", "is", null)
     .or(`event_date_start.gte.${today},event_date_start.is.null`)
     .order("edition_name", { ascending: true });
-  if (brand !== "PMG Roundtables") query = query.eq("brand", brand);
+  if (brand !== ROUNDTABLE_BRAND) query = query.eq("brand", brand);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ events: [], error: "load_failed" });
 
   let rows = ((data ?? []) as Row[]).filter((r) => (r.edition_name ?? "").trim() !== "");
   rows =
-    brand === "PMG Roundtables"
-      ? rows.filter((r) => isRoundtable(r) && r.edition_name !== PORTFOLIO_EDITION)
+    brand === ROUNDTABLE_BRAND
+      ? rows.filter((r) => isRoundtable(r) && !isPortfolio(r))
       : rows.filter((r) => !isRoundtable(r));
 
-  if (brand === "PMG Roundtables") {
+  if (brand === ROUNDTABLE_BRAND) {
     const { data: authUser } = await sb.auth.admin.getUserById(user.id);
     const markets = parseMarkets(authUser?.user?.app_metadata, authUser?.user?.user_metadata);
     if (markets) rows = rows.filter((r) => markets.some((m) => (r.edition_name ?? "").toLowerCase().includes(m)));
@@ -82,7 +91,7 @@ export async function GET(request: NextRequest) {
       id: r.id,
       name: r.edition_name,
       // pmg-agent lib/events/sponsor-eligibility isClientRoundtable
-      client_roundtable: (r.format ?? "").trim().toLowerCase() === "roundtable" && r.edition_name !== PORTFOLIO_EDITION,
+      client_roundtable: (r.format ?? "").trim().toLowerCase() === "roundtable" && !isPortfolio(r),
     })),
   });
 }

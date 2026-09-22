@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUser } from "@/lib/session";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { isRoundtableBrand } from "@/lib/brands";
 
 export const dynamic = "force-dynamic";
 
@@ -13,8 +14,9 @@ export async function GET(req: NextRequest) {
   const brand = (req.nextUrl.searchParams.get("brand") ?? "").trim();
   if (!brand) return NextResponse.json([], { status: 200 });
 
-  // PMG Roundtables uses a holding edition — skip the registry lookup.
-  if (brand === "PMG Roundtables") return NextResponse.json([], { status: 200 });
+  // PeerRoom (formerly "PMG Roundtables" — either name may arrive) uses a
+  // holding edition — skip the registry lookup.
+  if (isRoundtableBrand(brand)) return NextResponse.json([], { status: 200 });
 
   const sb = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);

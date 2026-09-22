@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { requireUser } from "@/lib/session";
+import { normalizeBrand } from "@/lib/brands";
 
 export const dynamic = "force-dynamic";
 const AGENT_BASE = process.env.AGENT_BASE_URL ?? "https://agent.pmgapphub.com";
@@ -30,6 +31,9 @@ export async function POST(request: NextRequest) {
   }
 
   const { submitted_by: _drop1, submitted_by_email: _drop2, ...safeBody } = clientBody as Record<string, unknown>;
+  // Legacy brand names (e.g. "PMG Roundtables" from a stale form bundle) are
+  // written as the canonical value ("PeerRoom").
+  if (typeof safeBody.event_brand === "string") safeBody.event_brand = normalizeBrand(safeBody.event_brand);
 
   const payload = {
     ...safeBody,

@@ -27,8 +27,11 @@
 //     it to review, never straight in.
 //   · No individual is recorded as a sponsor on a roundtable (Syed, clarified
 //     2026-09-19): roundtable participants are delegates/speakers, so the
-//     Sponsor and Sponsor-Speaker roles are not offered for PMG Roundtables.
+//     Sponsor and Sponsor-Speaker roles are not offered for PeerRoom.
 //     Every other role is. Company-level roundtable sponsorship is a deal.
+//   · The roundtables brand is "PeerRoom" (renamed from "PMG Roundtables" on
+//     2026-09-22). The form only ever sends "PeerRoom"; older rows that still
+//     carry the legacy name are displayed as PeerRoom.
 // ════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -85,8 +88,11 @@ type IntakeRequest = {
 
 // ─── Brand/Role constants ─────────────────────────────────────────────────────
 
-const BRANDS = ["10DX", "VERIFY", "4WARD", "PMG Roundtables"] as const;
+const ROUNDTABLE_BRAND = "PeerRoom";
+const BRANDS = ["10DX", "VERIFY", "4WARD", ROUNDTABLE_BRAND] as const;
 type Brand = (typeof BRANDS)[number];
+// Display a stored brand under its current name (legacy "PMG Roundtables" → PeerRoom).
+const showBrand = (b: string | null | undefined) => (b && /^pmg roundtables?$/i.test(b.trim()) ? ROUNDTABLE_BRAND : b);
 
 // Sponsor-Speaker (pmg-agent mig 293) = a sponsor's representative who speaks:
 // ONE role — kept in the sales pipeline as a sponsor, listed on the programme
@@ -98,9 +104,9 @@ type Role = (typeof ROLES)[number];
 const SPONSOR_SIDE: readonly Role[] = ["Sponsor", "Sponsor-Speaker"];
 // (Syed, clarified 2026-09-19): no individual is recorded as a sponsor on a
 // roundtable; participants are delegates/speakers; company-level roundtable
-// sponsorship is a deal. So PMG Roundtables gets every role but the sponsor side.
+// sponsorship is a deal. So PeerRoom gets every role but the sponsor side.
 const rolesFor = (brand: Brand | ""): readonly Role[] =>
-  brand === "PMG Roundtables" ? ROLES.filter((r) => !SPONSOR_SIDE.includes(r)) : ROLES;
+  brand === ROUNDTABLE_BRAND ? ROLES.filter((r) => !SPONSOR_SIDE.includes(r)) : ROLES;
 
 // Progress card steps (the server does all three inside ONE request; the ticks
 // advance on a timer so the wait reads as progress, and all complete on reply).
@@ -309,9 +315,9 @@ export default function AddContactForm() {
   // (Syed, clarified 2026-09-19): no individual is recorded as a sponsor on a
   // roundtable; participants are delegates/speakers; company-level roundtable
   // sponsorship is a deal (pmg-agent lib/events/sponsor-eligibility). rolesFor
-  // already hides Sponsor for PMG Roundtables; this also catches a roundtable
+  // already hides Sponsor for PeerRoom; this also catches a roundtable
   // filed under a summit brand.
-  const sponsorBlocked = !!role && SPONSOR_SIDE.includes(role) && (brand === "PMG Roundtables" || !!selectedEvent?.client_roundtable);
+  const sponsorBlocked = !!role && SPONSOR_SIDE.includes(role) && (brand === ROUNDTABLE_BRAND || !!selectedEvent?.client_roundtable);
   // What still has to be picked before anything can be written.
   const missingPicks = [!brand && "brand", !eventId && "edition", !role && "role"].filter(Boolean) as string[];
   const picksReady = missingPicks.length === 0 && !sponsorBlocked;
@@ -592,7 +598,7 @@ export default function AddContactForm() {
             <Person c={checkState.contact} />
             {(checkState.contact.event_brand || checkState.contact.participant_type) && (
               <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                {[checkState.contact.event_brand, checkState.contact.participant_type].filter(Boolean).join(" › ")}
+                {[showBrand(checkState.contact.event_brand), checkState.contact.participant_type].filter(Boolean).join(" › ")}
               </div>
             )}
             <p style={{ fontSize: 13, color: "#c0392b", margin: "8px 0 0" }}>
@@ -644,15 +650,15 @@ export default function AddContactForm() {
           </select>
         </div>
 
-        {/* Edition select — for PMG Roundtables this lists the roundtables themselves */}
+        {/* Edition select — for PeerRoom this lists the roundtables themselves */}
         <div>
-          <label htmlFor="event_id">{brand === "PMG Roundtables" ? "Roundtable" : "Edition"}</label>
+          <label htmlFor="event_id">{brand === ROUNDTABLE_BRAND ? "Roundtable" : "Edition"}</label>
           <select id="event_id" value={eventId} onChange={(e) => setEventId(e.target.value)} disabled={!brand || eventsLoading}>
             {!brand && <option value="">Select a brand first</option>}
             {brand && eventsLoading && <option value="">Loading…</option>}
             {brand && !eventsLoading && events.length === 0 && <option value="">No upcoming editions</option>}
             {brand && !eventsLoading && events.length > 0 && (
-              <option value="">{brand === "PMG Roundtables" ? "Select roundtable…" : "Select edition…"}</option>
+              <option value="">{brand === ROUNDTABLE_BRAND ? "Select roundtable…" : "Select edition…"}</option>
             )}
             {brand && !eventsLoading && events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}
           </select>
@@ -660,7 +666,7 @@ export default function AddContactForm() {
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
               {eventsError
                 ? "Couldn’t load editions — reload the page to try again."
-                : brand === "PMG Roundtables"
+                : brand === ROUNDTABLE_BRAND
                 ? "No upcoming roundtable you can add to (roundtables are limited to your markets)."
                 : "No upcoming edition for this brand."}
             </p>
@@ -674,13 +680,13 @@ export default function AddContactForm() {
             <option value="">Select role…</option>
             {rolesFor(brand).map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
-          {brand === "PMG Roundtables" && (
+          {brand === ROUNDTABLE_BRAND && (
             <p className="help" style={{ marginTop: 4 }}>Roundtable participants are delegates and speakers, so Sponsor and Sponsor-Speaker aren’t offered here. A company sponsoring a roundtable is tracked as a deal in Sales CRM.</p>
           )}
           {role === "Sponsor-Speaker" && (
             <p className="help" style={{ marginTop: 4 }}>Only once the sponsor has confirmed this person as its speaker — recorded as confirmed, kept in the sales pipeline as a sponsor and listed on the programme as a Sponsor-Speaker. Not for prospects: add a prospect as Sponsor.</p>
           )}
-          {sponsorBlocked && brand !== "PMG Roundtables" && (
+          {sponsorBlocked && brand !== ROUNDTABLE_BRAND && (
             <p className="muted" style={{ fontSize: 12, marginTop: 4, color: "#c0392b" }}>
               {editionLabel()} is a roundtable — a person can’t be added to it as a sponsor.
             </p>
@@ -718,7 +724,7 @@ export default function AddContactForm() {
                   <div style={{ flex: 1, minWidth: 180 }}>
                     <div style={{ fontWeight: 600, fontSize: 14 }}>{name ?? <span className="muted">Pending enrichment</span>}</div>
                     {(title || company) && <div className="muted" style={{ fontSize: 13 }}>{[title, company].filter(Boolean).join(" · ")}</div>}
-                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{s.event_brand} › {s.participant_type}</div>
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{showBrand(s.event_brand)} › {s.participant_type}</div>
                     <div className="muted" style={{ fontSize: 12, marginTop: 2, wordBreak: "break-all" }}>{s.linkedin_url}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
