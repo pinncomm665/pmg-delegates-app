@@ -5,7 +5,7 @@ import {
   DEFAULT_TARGET_DELEGATES,
   type SummitPulse,
 } from "./pulse";
-import { SUMMIT_BRANDS, normalizeBrand, brandOf } from "./brands";
+import { SUMMIT_BRANDS, normalizeBrand, brandOf, brandDbValues, isRoundtableEdition, PEERROOM_EDITION_ILIKE } from "./brands";
 import { aliasesFor, isTrackedOwnerEmail } from "./activityOwners";
 import { type OwnerFilter } from "./roleOwner";
 
@@ -314,9 +314,10 @@ export async function getDelegates(filters: {
     let query = sb
       .from("delegate_list_view")
       .select("*", { count: "exact" })
-      .not("event_edition", "ilike", "%roundtable%");
+      .not("event_edition", "ilike", "%roundtable%")
+      .not("event_edition", "ilike", PEERROOM_EDITION_ILIKE);
 
-    if (filters.brand) query = query.eq("event_brand", filters.brand);
+    if (filters.brand) query = query.in("event_brand", brandDbValues(filters.brand));
     if (filters.edition) query = query.eq("event_edition", filters.edition);
     if (filters.status) query = query.eq("stage", filters.status.toLowerCase());
     // search_text = lower(name + denormalised company); the ILIKE is served by
@@ -369,7 +370,7 @@ export async function getStageCounts(filters: {
       let total = 0;
       for (const r of view) {
         const ed = r.event_edition ?? "";
-        if (/roundtable/i.test(ed)) continue;
+        if (isRoundtableEdition(ed)) continue;
         if (filters.edition && ed !== filters.edition) continue;
         if (filters.brand && brandOf(ed) !== normalizeBrand(filters.brand)) continue;
         const s = (r.stage ?? "identified").toLowerCase();
@@ -384,8 +385,9 @@ export async function getStageCounts(filters: {
     let query = sb
       .from("delegate_list_view")
       .select("stage")
-      .not("event_edition", "ilike", "%roundtable%");
-    if (filters.brand) query = query.eq("event_brand", filters.brand);
+      .not("event_edition", "ilike", "%roundtable%")
+      .not("event_edition", "ilike", PEERROOM_EDITION_ILIKE);
+    if (filters.brand) query = query.in("event_brand", brandDbValues(filters.brand));
     if (filters.edition) query = query.eq("event_edition", filters.edition);
     if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
     if (filters.hasValidEmail) query = query.eq("email_status", "Valid");
@@ -457,8 +459,9 @@ export async function getDelegateIdsMatching(filters: {
     let query = sb
       .from("delegate_list_view")
       .select("id")
-      .not("event_edition", "ilike", "%roundtable%");
-    if (filters.brand) query = query.eq("event_brand", filters.brand);
+      .not("event_edition", "ilike", "%roundtable%")
+      .not("event_edition", "ilike", PEERROOM_EDITION_ILIKE);
+    if (filters.brand) query = query.in("event_brand", brandDbValues(filters.brand));
     if (filters.edition) query = query.eq("event_edition", filters.edition);
     if (filters.status) query = query.eq("stage", filters.status.toLowerCase());
     if (filters.q) query = query.ilike("search_text", `%${filters.q.toLowerCase()}%`);
@@ -551,14 +554,14 @@ export async function getFilterOptions(): Promise<{
   if (view) {
     for (const r of view) {
       const ed = (r.event_edition ?? "").trim();
-      if (!ed || /roundtable/i.test(ed)) continue;
+      if (!ed || isRoundtableEdition(ed)) continue;
       seen.add(ed);
     }
   } else {
     const { data } = await sb.from("delegates").select("event_edition").limit(20000);
     (data ?? []).forEach((r: any) => {
       const ed = (r.event_edition ?? "").trim();
-      if (ed && !/roundtable/i.test(ed)) seen.add(ed);
+      if (ed && !isRoundtableEdition(ed)) seen.add(ed);
     });
   }
   for (const ed of seen) {

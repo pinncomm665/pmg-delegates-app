@@ -9,6 +9,7 @@ import {
   trackedOwnerOrFilter,
   type TrackedOwner,
 } from "./activityOwners";
+import { PEERROOM_EDITION_ILIKE } from "./brands";
 
 // Activity Report — reads the pmg-agent VIEW `public.team_activity_feed`
 // (mig 217) with the service key. One row per team touch (emails, calls,
@@ -199,7 +200,9 @@ async function roleMembers(sb: ReturnType<typeof supabaseAdmin>, ids: string[]):
     if (ROLE_TABLE_EDITION_FILTER) {
       q = ROLE_TABLE_EDITION_FILTER.op === "ilike"
         ? q.ilike("event_edition", ROLE_TABLE_EDITION_FILTER.pattern)
-        : q.not("event_edition", "ilike", ROLE_TABLE_EDITION_FILTER.pattern);
+        // The holding edition was renamed "PMG Roundtables" → "PeerRoom" and no
+        // longer matches %roundtable% — exclude it by that name too.
+        : q.not("event_edition", "ilike", ROLE_TABLE_EDITION_FILTER.pattern).not("event_edition", "ilike", PEERROOM_EDITION_ILIKE);
     }
     const { data } = await q;
     for (const r of (data ?? []) as any[]) if (r.contact_id) out.add(String(r.contact_id));
