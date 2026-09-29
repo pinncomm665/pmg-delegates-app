@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { retiredRedirect } from "@/lib/retired";
 
 // Refreshes the Supabase auth session cookie on every request, gates routes,
 // and forwards the verified user to pages via the x-pmg-user header so
 // lib/session doesn't pay a second auth round trip per render.
 export async function middleware(request: NextRequest) {
+  // Retired — every page now lives in People CRM (lib/retired.ts).
+  const moved = retiredRedirect(request);
+  if (moved) return moved;
+
   // Never trust a client-supplied copy of the identity header.
   request.headers.delete("x-pmg-user");
 
